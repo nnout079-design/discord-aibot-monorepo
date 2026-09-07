@@ -1,0 +1,23 @@
+﻿app = "lkeff-listen-bot"
+primary_region = "iad"
+
+[build]
+builder = "heroku"
+
+[[services]]
+protocol = "tcp"
+internal_port = 3000
+processes = ["app"]
+
+  [[services.ports]]
+  port = 80
+  handlers = ["http"]
+  force_https = true
+
+  [[services.ports]]
+  port = 443
+  handlers = ["tls", "http"]
+
+[env]
+NODE_ENV = "production"
+PORT = "3000"
