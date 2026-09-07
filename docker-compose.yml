@@ -1,0 +1,42 @@
+﻿param([ValidateSet("build", "push", "full", "test", "status", "logs", "stop")][string]$Action = "full")
+Write-Host "
+✓ Deployment Script
+" -ForegroundColor Green
+switch ($Action) {
+    "build" {
+        Write-Host "Building...
+" -ForegroundColor Cyan
+        $bots = "soundproof", "lkeff-listen", "airhornbot", "discord-aibot", "lastfm-client"
+        foreach ($bot in $bots) {
+            if (Test-Path ".\\$bot") {
+                Write-Host "  $bot" -ForegroundColor Yellow
+                Push-Location ".\\$bot"
+                if (-not (Test-Path "Dockerfile")) { Copy-Item "..\\Dockerfile.template" "Dockerfile" -Force }
+                docker build -t "discord-bot-$bot:latest" . 2>&1 | Out-Null
+                Write-Host "    ✓
+" -ForegroundColor Green
+                Pop-Location
+            }
+        }
+    }
+    "test" {
+        Write-Host "Testing...
+" -ForegroundColor Cyan
+        @"
+version: '3.9'
+services:
+  soundproof:
+    image: discord-bot-soundproof:latest
+    ports: ["3001:3000"]
+  listen:
+    image: discord-bot-lkeff-listen:latest
+    ports: ["3002:3000"]
+  airhornbot:
+    image: discord-bot-airhornbot:latest
+    ports: ["3003:3000"]
+  discord-aibot:
+    image: discord-bot-discord-aibot:latest
+    ports: ["3004:3000"]
+  lastfm:
+    image: discord-bot-lastfm-client:latest
+    ports: ["3005:3000"]

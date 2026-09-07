@@ -1,0 +1,1 @@
+﻿{"name":"lkeff-listen","version":"1.0.0","description":"Discord bot","main":"dist/index.js","scripts":{"dev":"ts-node src/index.ts","build":"tsc","start":"node dist/index.js"},"dependencies":{"discord.js":"^14.13.0","dotenv":"^16.3.1"},"devDependencies":{"typescript":"^5.2.2","@types/node":"^20.5.0"}}
