@@ -1,0 +1,12 @@
+services:
+  postgres:
+    container_name: discord-sandbox-postgres
+    ports: []
+
+  redis:
+    container_name: discord-sandbox-redis
+    ports: []
+
+  mongo:
+    container_name: discord-sandbox-mongo
+    ports: []

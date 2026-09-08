@@ -2,4 +2,5 @@
 dist/
 *.log
 .env
+.env.sandbox
 .DS_Store

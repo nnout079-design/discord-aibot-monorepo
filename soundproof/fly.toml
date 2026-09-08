@@ -1,8 +1,8 @@
-﻿app = "soundproof-bot"
+app = "soundproof-bot"
 primary_region = "iad"
 
 [build]
-builder = "heroku"
+builder = "paketobuildpacks/builder:base"
 
 [[services]]
 protocol = "tcp"

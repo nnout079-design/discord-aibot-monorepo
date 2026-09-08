@@ -1,46 +1,354 @@
-﻿version: '3.9'
-services:
+﻿services:
+  # Database Services
+  postgres:
+    image: postgres:16-alpine
+    container_name: discord-postgres-db
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-discord}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-discord_password}
+      - POSTGRES_DB=${POSTGRES_DB:-discord_bots}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5432:5432"
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-discord}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    networks:
+      - database-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: discord-redis-cache
+    command: redis-server --requirepass ${REDIS_PASSWORD:-redis_secure_password}
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-redis_secure_password}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    networks:
+      - database-network
+
+  mongo:
+    image: mongo:latest
+    container_name: discord-mongo-db
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_USER:-discord}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_PASSWORD:-discord_password}
+    volumes:
+      - mongo_data:/data/db
+    ports:
+      - "127.0.0.1:27017:27017"
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    networks:
+      - database-network
+
+  # Discord Bot Services
+  # Soundproof is intentionally opt-in because it currently depends on a valid Discord token
+  # and should not block the rest of the monorepo when that token is not configured.
   soundproof:
+    profiles: ["soundproof"]
     image: discord-bot-soundproof:latest
     container_name: soundproof-bot
+    build: ./soundproof
     ports:
-      - "3001:3000"
+      - "127.0.0.1:3001:3000"
     environment:
       - DISCORD_TOKEN=${DISCORD_TOKEN}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-discord}:${POSTGRES_PASSWORD:-discord_password}@postgres:5432/${POSTGRES_DB:-discord_bots}
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-redis_secure_password}@redis:6379
+      - MONGO_URL=mongodb://${MONGO_USER:-discord}:${MONGO_PASSWORD:-discord_password}@mongo:27017/discord_bots?authSource=admin
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+      - apparmor:docker-default
+    read_only: true
+    tmpfs:
+      - /tmp
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    networks:
+      - discord-network
+      - database-network
 
   listen:
     image: discord-bot-lkeff-listen:latest
     container_name: listen-bot
+    build: ./lkeff-listen
     ports:
-      - "3002:3000"
+      - "127.0.0.1:3002:3000"
     environment:
       - DISCORD_TOKEN=${DISCORD_TOKEN}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-discord}:${POSTGRES_PASSWORD:-discord_password}@postgres:5432/${POSTGRES_DB:-discord_bots}
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-redis_secure_password}@redis:6379
+      - MONGO_URL=mongodb://${MONGO_USER:-discord}:${MONGO_PASSWORD:-discord_password}@mongo:27017/discord_bots?authSource=admin
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+      - apparmor:docker-default
+    read_only: true
+    tmpfs:
+      - /tmp
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    networks:
+      - discord-network
+      - database-network
 
   airhornbot:
     image: discord-bot-airhornbot:latest
     container_name: airhornbot
+    build: ./airhornbot
     ports:
-      - "3003:3000"
+      - "127.0.0.1:3003:3000"
     environment:
       - DISCORD_TOKEN=${DISCORD_TOKEN}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-discord}:${POSTGRES_PASSWORD:-discord_password}@postgres:5432/${POSTGRES_DB:-discord_bots}
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-redis_secure_password}@redis:6379
+      - MONGO_URL=mongodb://${MONGO_USER:-discord}:${MONGO_PASSWORD:-discord_password}@mongo:27017/discord_bots?authSource=admin
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+      - apparmor:docker-default
+    read_only: true
+    tmpfs:
+      - /tmp
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    networks:
+      - discord-network
+      - database-network
 
   discord-aibot:
     image: discord-bot-discord-aibot:latest
     container_name: discord-aibot
+    build: ./discord-aibot
     ports:
-      - "3004:3000"
+      - "127.0.0.1:3004:3000"
     environment:
       - DISCORD_TOKEN=${DISCORD_TOKEN}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-discord}:${POSTGRES_PASSWORD:-discord_password}@postgres:5432/${POSTGRES_DB:-discord_bots}
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-redis_secure_password}@redis:6379
+      - MONGO_URL=mongodb://${MONGO_USER:-discord}:${MONGO_PASSWORD:-discord_password}@mongo:27017/discord_bots?authSource=admin
+      - CLAUDE_API_KEY=${CLAUDE_API_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+      - apparmor:docker-default
+    read_only: true
+    tmpfs:
+      - /tmp
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    networks:
+      - discord-network
+      - database-network
 
   lastfm:
     image: discord-bot-lastfm-client:latest
     container_name: lastfm-bot
+    build: ./lastfm-client
     ports:
-      - "3005:3000"
+      - "127.0.0.1:3005:3000"
     environment:
       - DISCORD_TOKEN=${DISCORD_TOKEN}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-discord}:${POSTGRES_PASSWORD:-discord_password}@postgres:5432/${POSTGRES_DB:-discord_bots}
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-redis_secure_password}@redis:6379
+      - MONGO_URL=mongodb://${MONGO_USER:-discord}:${MONGO_PASSWORD:-discord_password}@mongo:27017/discord_bots?authSource=admin
+      - LASTFM_API_KEY=${LASTFM_API_KEY}
+      - LASTFM_API_SECRET=${LASTFM_API_SECRET}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+      - apparmor:docker-default
+    read_only: true
+    tmpfs:
+      - /tmp
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    networks:
+      - discord-network
+      - database-network
+
+  # Monitoring Services (for Phase 4)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: discord-prometheus
+    ports:
+      - "127.0.0.1:9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    networks:
+      - monitoring-network
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: discord-grafana
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_USER:-admin}
+      - GF_INSTALL_PLUGINS=
+      - GF_SERVER_ROOT_URL=http://localhost:3000
+    volumes:
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    networks:
+      - monitoring-network
+
+volumes:
+  postgres_data:
+  redis_data:
+  mongo_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  discord-network:
+    driver: bridge
+    internal: false
+  database-network:
+    driver: bridge
+    internal: true
+  monitoring-network:
+    driver: bridge
+    internal: false

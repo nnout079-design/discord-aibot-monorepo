@@ -1,8 +1,8 @@
-﻿app = "discord-aibot-bot"
+app = "discord-aibot-bot"
 primary_region = "iad"
 
 [build]
-builder = "heroku"
+builder = "paketobuildpacks/builder:base"
 
 [[services]]
 protocol = "tcp"

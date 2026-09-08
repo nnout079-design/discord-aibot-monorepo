@@ -1,8 +1,8 @@
-﻿app = "lastfm-client-bot"
+app = "lastfm-client-bot"
 primary_region = "iad"
 
 [build]
-builder = "heroku"
+builder = "paketobuildpacks/builder:base"
 
 [[services]]
 protocol = "tcp"

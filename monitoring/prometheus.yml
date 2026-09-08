@@ -1,0 +1,19 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'discord-bots'
+    static_configs:
+      - targets: 
+          - 'soundproof:3000'
+          - 'listen:3000'
+          - 'airhornbot:3000'
+          - 'discord-aibot:3000'
+          - 'lastfm:3000'
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']

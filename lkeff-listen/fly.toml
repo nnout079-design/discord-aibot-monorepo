@@ -1,8 +1,8 @@
-﻿app = "lkeff-listen-bot"
+app = "lkeff-listen-bot"
 primary_region = "iad"
 
 [build]
-builder = "heroku"
+builder = "paketobuildpacks/builder:base"
 
 [[services]]
 protocol = "tcp"
