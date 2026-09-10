@@ -1,5 +1,6 @@
 import { ChatInputCommandInteraction, SlashCommandBuilder } from "discord.js";
 import { HybridReasoner } from "../../reasoning/reasoning";
+import { isCoworker } from "../../security/coworkers";
 
 const reasoner = new HybridReasoner();
 
@@ -14,6 +15,14 @@ export const data = new SlashCommandBuilder()
   );
 
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
+  if (!isCoworker(interaction.user)) {
+    await interaction.reply({
+      content: "This assistant is available to approved coworkers only.",
+      ephemeral: true
+    });
+    return;
+  }
+
   try {
     await interaction.deferReply();
 

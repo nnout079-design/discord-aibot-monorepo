@@ -15,7 +15,7 @@
     security_opt:
       - no-new-privileges:true
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-discord}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-discord} -d ${POSTGRES_DB:-discord_bots}"]
       interval: 10s
       timeout: 5s
       retries: 5
