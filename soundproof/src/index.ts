@@ -14,7 +14,7 @@ startCompanionServer();
 client.once('ready', async () => {
 	console.log('✓ Bot ready');
 	await Promise.all(commands.map(command => client.application?.commands.create(command)));
-	console.log('✓ Registered /ask');
+	console.log('✓ Registered /reason');
 	console.log('✓ Registered /stream and /game');
 });
 
