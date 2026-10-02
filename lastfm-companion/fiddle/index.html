@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'" />
+    <title>Song entry</title>
+    <style>
+      body { margin: 0; height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center;
+             background: #111; color: #eee; font-family: system-ui, sans-serif; user-select: none; }
+      #flash { position: fixed; inset: 0; background: #fff; opacity: 0; pointer-events: none; }
+      #label { font-size: 22px; letter-spacing: 0.1em; text-transform: uppercase; color: #999; }
+      #big { font-size: 140px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; }
+      #track { font-size: 20px; }
+      #bpm, #status { font-size: 14px; color: #777; margin-top: 6px; }
+      #status { position: fixed; bottom: 10px; }
+    </style>
+  </head>
+  <body>
+    <div id="flash"></div>
+    <div id="label">Waiting for sync</div>
+    <div id="big">–</div>
+    <div id="track"></div>
+    <div id="bpm"></div>
+    <div id="status"></div>
+    <script src="./renderer.js"></script>
+  </body>
+</html>
