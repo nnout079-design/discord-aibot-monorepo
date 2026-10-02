@@ -32,7 +32,7 @@ async function main(): Promise<void> {
   if (!response.ok) throw new Error(result.error ?? `Bot returned ${response.status}`);
 
   if (action === "stop") {
-    console.log(result.stopped ? "Stopped." : "Nothing was armed.");
+    console.log(result.stopped ? "Cancelled before the downbeat." : "Stopped.");
     return;
   }
   const r = result as StartResponse;

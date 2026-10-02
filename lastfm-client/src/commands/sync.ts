@@ -19,7 +19,7 @@ export const data = new SlashCommandBuilder()
       .setName("pattern")
       .setDescription("Percussion pattern to enter on the downbeat")
       .addChoices(...Object.keys(PERCUSSION_PATTERNS).map(name => ({ name, value: name })))))
-  .addSubcommand(command => command.setName("stop").setDescription("Cancel the armed song entry"))
+  .addSubcommand(command => command.setName("stop").setDescription("Cancel the armed song entry or stop the one playing"))
   .addSubcommand(command => command.setName("status").setDescription("Show the armed song entry"));
 
 const unix = (ms: number) => Math.floor(ms / 1000);
@@ -83,7 +83,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
   if (action === "stop") {
     const stopped = await stopEntry(guildId);
-    await interaction.reply(stopped ? "Song entry cancelled." : "No song entry is armed.");
+    await interaction.reply(stopped ? "Song entry cancelled." : "Stopped.");
     return;
   }
 
