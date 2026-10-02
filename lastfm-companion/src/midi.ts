@@ -30,3 +30,22 @@ export function logOutput(log: (message: string) => void): MidiOut {
     close: () => {}
   };
 }
+
+// Opens each matching output once; returns null when no output matches.
+export function outputOpener(log: (message: string) => void): (name: string) => MidiOut | null {
+  const opened = new Map<string, MidiOut>();
+  return name => {
+    const portName = listOutputs().find(port => port.toLowerCase().includes(name.toLowerCase()));
+    if (!portName) return null;
+    const existing = opened.get(portName);
+    if (existing) return existing;
+    try {
+      const { out } = openOutput(portName);
+      opened.set(portName, out);
+      return out;
+    } catch (error) {
+      log(`Could not open ${portName}: ${error instanceof Error ? error.message : String(error)}`);
+      return null;
+    }
+  };
+}

@@ -10,9 +10,13 @@ export interface ControlResult {
   body: object;
 }
 
-export type ControlHandler = (action: "start" | "stop", body: unknown) => Promise<ControlResult>;
+export type ControlAction = "start" | "stop" | "now-playing";
+
+export type ControlHandler = (action: ControlAction, body: unknown) => Promise<ControlResult>;
 
 const MAX_BODY_BYTES = 4096;
+
+const CONTROL_PATHS: Record<string, ControlAction> = { "/sync/start": "start", "/sync/stop": "stop", "/sync/now-playing": "now-playing" };
 
 const sha256 = (value: string) => crypto.createHash("sha256").update(value).digest();
 
@@ -45,7 +49,7 @@ function writeEvent(res: http.ServerResponse, event: HubEvent): void {
 
 // Companions on users' PCs connect out to GET /sync/events (Server-Sent Events) and
 // align their clocks with GET /sync/time, so they never need a public URL of their own.
-// POST /sync/start and /sync/stop let a companion arm or stop an entry without Discord.
+// POST /sync/start, /sync/stop and /sync/now-playing let a companion arm, stop or look up an entry without Discord.
 export class CompanionHub {
   private clients = new Set<http.ServerResponse>();
   private armed: SongEntryEvent | null = null;
@@ -91,7 +95,7 @@ export class CompanionHub {
     return crypto.timingSafeEqual(sha256(given), sha256(this.token));
   }
 
-  private async handleControl(action: "start" | "stop", req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
+  private async handleControl(action: ControlAction, req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
     if (!this.token) {
       sendJson(res, 503, { error: "COMPANION_TOKEN is not configured on the bot" });
       return;
@@ -123,8 +127,9 @@ export class CompanionHub {
 
   private handle(req: http.IncomingMessage, res: http.ServerResponse): void {
     const { pathname } = new URL(req.url ?? "/", "http://hub");
-    if (req.method === "POST" && (pathname === "/sync/start" || pathname === "/sync/stop")) {
-      void this.handleControl(pathname === "/sync/start" ? "start" : "stop", req, res);
+    const action = CONTROL_PATHS[pathname];
+    if (req.method === "POST" && action) {
+      void this.handleControl(action, req, res);
       return;
     }
     if (req.method !== "GET") {

@@ -61,3 +61,46 @@ Schedule against `local.startAt` with `Date.now()` in the Electron app.
 3. Run `npm run sync afrobeat` in a second window.
 
 Timing is limited by the OS timer resolution (a few ms on most PCs).
+
+## Full rig (multiple MIDI ports)
+
+```
+npm run rig                 (lists MIDI outputs and how each rig section is routed)
+npm run rig -- --write      (writes rig.json with every section, to edit ports/channels/latency)
+```
+
+Each section (percussion, bass racks, Moog, orchestra, choir, organ, Bangla, Balkan, Taiko, Roman, Hardanger fiddle, DJ) has a port, channel, General MIDI program, note range and `latencyMs`. Ports that don't exist on your PC fall back to `MIDI_OUTPUT` with one shared channel per instrument family, so the Windows GS synth still plays the whole arrangement. `npm run sync stop` sends all-notes-off on every port.
+
+For each song the companion uses, in order: your MIDI file in `songs/`, the Lakh set (`npm run lakh`), a file made by `npm run transcribe "C:\Music\Artist - Title.mp3"` (needs `pip install demucs basic-pitch`), or a generated arrangement in the song's key and feel.
+
+```
+npm run sync "song=Queen - Bohemian Rhapsody"
+```
+
+## Song data from APIs
+
+The bot looks up each song in several services and sends the result with every event; each one is optional:
+
+- **Last.fm**: track tags, length, album cover, play counts, wiki summary, artist tags and similar artists.
+- **GetSongBPM** (`GETSONGBPM_API_KEY` on the bot, free key from https://getsongbpm.com/api): tempo, time signature, key, danceability, acousticness, genres, year. Tempo and meter set the song entry; key and danceability shape generated arrangements.
+- **MusicBrainz** (no key): song length when Last.fm has none.
+- **OpenAI** (`OPENAI_API_KEY` here): AI video backdrop styled on the album cover.
+
+## Studios
+
+```
+npm run studio setup                                   (once: General MIDI soundfont, plus FluidSynth and FFmpeg on Windows)
+npm run studio "song=Radiohead - Creep"                (all studios)
+npm run studio "song=Radiohead - Creep" studio=remaster
+npm run studio user=YOUR_LASTFM_NAME                   (the song you're scrobbling now)
+npm run studio reaper                                  (Reaper script that builds the live rig tracks)
+```
+
+Output goes to `studio\Artist - Title\`:
+
+- **Pro studio**: `arrangement.mid`, one MIDI and WAV stem per rig group in `stems\`, and `session.lua` (Reaper: Actions > Load ReaScript) that loads the stems at the song's tempo.
+- **Remaster studio**: `master.wav` and `master.mp3` (320 kbps), two-pass loudness normalised to -14 LUFS, -1 dBTP.
+- **AI-video studio**: `video.mp4` (1280x720) with spectrum, waveform, beat and downbeat flashes, song facts, and a caption when each section enters.
+- **Live studio**: `npm start` plays the same arrangement live across your MIDI ports. `mixxx\LastFM-Companion.midi.xml` lets Mixxx start deck 1 on the downbeat and stop it on `npm run sync stop` (MIDI port "Rig DJ").
+
+Every stem is rendered with the MuseScore General soundfont, so the full mix comes out even without a DAW or sample libraries.

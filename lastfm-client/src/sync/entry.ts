@@ -18,6 +18,21 @@ export interface TrackAttributes {
   url?: string;
   durationMs?: number;
   tags: string[];
+  mbid?: string;
+  imageUrl?: string;
+  summary?: string;
+  listeners?: number;
+  playcount?: number;
+  artistTags?: string[];
+  similarArtists?: string[];
+  bpm?: number;
+  timeSig?: number;
+  key?: string;
+  openKey?: string;
+  danceability?: number;
+  acousticness?: number;
+  genres?: string[];
+  year?: number;
 }
 
 export interface SongEntryEvent {

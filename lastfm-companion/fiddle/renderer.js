@@ -1,6 +1,7 @@
 const el = id => document.getElementById(id);
 const FLASH_MS = 150;
 let entry = null;
+const SOURCES = { file: "Your MIDI file", lakh: "Lakh MIDI", transcribed: "Transcribed audio", generated: "Generated arrangement" };
 
 function show(label, big, flash = 0, color = "#ffffff") {
   el("label").textContent = label;
@@ -16,9 +17,17 @@ window.sync.onEvent(event => {
     entry = event;
     el("track").textContent = event.track ? `${event.track.artist} - ${event.track.name}` : event.pattern ?? "song entry";
     el("bpm").textContent = `${event.bpm.toFixed(1)} BPM, ${event.beatsPerBar} beats per bar`;
+    const arrangement = event.arrangement;
+    el("source").textContent = arrangement ? `${SOURCES[arrangement.source] ?? arrangement.source}, ${arrangement.sections.length} sections` : "";
+    el("sections").replaceChildren(...(arrangement?.sections ?? []).map(name => {
+      const chip = document.createElement("span");
+      chip.textContent = name;
+      return chip;
+    }));
   } else if (event.type === "song-stop") {
     entry = null;
     show("Stopped", "–");
+    el("sections").classList.remove("live");
   }
 });
 
@@ -33,6 +42,7 @@ function frame() {
   if (endAt && now >= endAt) {
     entry = null;
     show("Ended", "–");
+    el("sections").classList.remove("live");
   } else if (now < countInAt) {
     show("Get ready", `${((startAt - now) / 1000).toFixed(1)}s`);
   } else if (now < startAt) {
@@ -45,6 +55,8 @@ function frame() {
     const beatInBar = (beats % beatsPerBar) + 1;
     const phase = (now - startAt) % beatMs;
     const downbeat = beatInBar === 1;
+    el("sections").classList.add("live");
+    el("sections").style.setProperty("--pulse", String(Math.max(0, 1 - phase / (beatMs * 0.8))));
     show("Playing", `${bar}.${beatInBar}`, Math.max(0, 1 - phase / FLASH_MS) * (downbeat ? 1 : 0.4), downbeat ? "#ff3355" : "#ffffff");
   }
 }

@@ -10,7 +10,27 @@ export interface LastFmTrack {
 	listeners?: number;
 	durationMs?: number;
 	tags?: string[];
+	mbid?: string;
+	imageUrl?: string;
+	summary?: string;
 }
+
+export interface LastFmArtist {
+	name: string;
+	tags: string[];
+	similar: string[];
+	listeners?: number;
+	summary?: string;
+}
+
+export function plainSummary(html: unknown, max = 300): string | undefined {
+	if (typeof html !== 'string') return undefined;
+	const text = html.replace(/<a [^>]*>.*?<\/a>\.?/g, '').replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+	return text ? (text.length > max ? `${text.slice(0, max - 1)}…` : text) : undefined;
+}
+
+const largestImage = (images: any): string | undefined =>
+	Array.isArray(images) ? images.map((img: any) => img['#text']).filter(Boolean).pop() : undefined;
 
 export interface LastFmUser {
 	name: string;
@@ -94,7 +114,22 @@ export class LastFmApi {
 			playcount: parseInt(trackData.playcount),
 			listeners: parseInt(trackData.listeners),
 			durationMs: Number(trackData.duration) || undefined,
-			tags: trackData.toptags?.tag?.map((tag: any) => tag.name) ?? []
+			tags: trackData.toptags?.tag?.map((tag: any) => tag.name) ?? [],
+			mbid: trackData.mbid || undefined,
+			imageUrl: largestImage(trackData.album?.image),
+			summary: plainSummary(trackData.wiki?.summary)
+		};
+	}
+
+	async getArtistInfo(artist: string): Promise<LastFmArtist> {
+		const data = await this.makeRequest({ method: 'artist.getInfo', api_key: this.apiKey, artist, autocorrect: '1', format: 'json' });
+		const a = data.artist;
+		return {
+			name: a.name,
+			tags: a.tags?.tag?.map((tag: any) => tag.name) ?? [],
+			similar: a.similar?.artist?.map((s: any) => s.name) ?? [],
+			listeners: Number(a.stats?.listeners) || undefined,
+			summary: plainSummary(a.bio?.summary)
 		};
 	}
 

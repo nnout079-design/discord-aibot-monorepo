@@ -9,10 +9,15 @@
     "start": "tsx src/index.ts",
     "outputs": "tsx src/index.ts --list",
     "sync": "tsx src/trigger.ts",
-    "test": "node --import tsx --test src/*.test.ts"
+    "test": "node --import tsx --test src/*.test.ts",
+    "rig": "tsx src/rigcli.ts",
+    "lakh": "tsx src/lakh.ts",
+    "transcribe": "tsx src/transcribe.ts",
+    "studio": "tsx src/studio.ts"
   },
   "dependencies": {
     "@julusian/midi": "^3.8.1",
+    "@tonejs/midi": "2.0.28",
     "dotenv": "^16.6.1",
     "tsx": "^4.23.15"
   },
