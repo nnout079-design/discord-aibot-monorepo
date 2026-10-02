@@ -5,6 +5,7 @@ import * as lastfmCommand from './commands/lastfm';
 import * as syncCommand from './commands/sync';
 import * as companionCommand from './commands/companion';
 import { companionHub } from './sync/companion-hub';
+import { companionControl } from './sync/session';
 dotenv.config();
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 const commands = [percussionCommand.data, lastfmCommand.data, syncCommand.data, companionCommand.data];
@@ -42,6 +43,7 @@ client.on('interactionCreate', async interaction => {
     else await interaction.reply(msg).catch(() => {});
   }
 });
+companionHub.setControl(companionControl);
 companionHub.listen(Number(process.env.PORT ?? 8080))
   .then(port => console.log(`✓ Companion hub listening on ${port}`))
   .catch(error => console.error('Companion hub failed:', error));

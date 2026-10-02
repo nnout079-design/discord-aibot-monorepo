@@ -58,3 +58,41 @@ test("connected companions receive published events and late joiners get the arm
     await hub.close();
   }
 });
+
+test("control endpoints need the token and pass the JSON body to the handler", async () => {
+  const hub = new CompanionHub("secret");
+  const calls: Array<{ action: string; body: unknown }> = [];
+  hub.setControl(async (action, body) => {
+    calls.push({ action, body });
+    return { status: 200, body: { ok: true } };
+  });
+  const port = await hub.listen(0);
+  const url = `http://127.0.0.1:${port}`;
+  const auth = { authorization: "Bearer secret", "content-type": "application/json" };
+  try {
+    assert.equal((await fetch(`${url}/sync/start`, { method: "POST", body: "{}" })).status, 401);
+    assert.equal(calls.length, 0);
+
+    const start = await fetch(`${url}/sync/start`, { method: "POST", headers: auth, body: JSON.stringify({ pattern: "taiko", bpm: 120 }) });
+    assert.equal(start.status, 200);
+    assert.deepEqual(await start.json(), { ok: true });
+    assert.equal((await fetch(`${url}/sync/stop`, { method: "POST", headers: auth })).status, 200);
+    assert.deepEqual(calls, [{ action: "start", body: { pattern: "taiko", bpm: 120 } }, { action: "stop", body: {} }]);
+
+    assert.equal((await fetch(`${url}/sync/start`, { method: "POST", headers: auth, body: "{nope" })).status, 400);
+    assert.equal((await fetch(`${url}/sync/time`, { method: "POST", headers: auth })).status, 405);
+  } finally {
+    await hub.close();
+  }
+});
+
+test("control endpoints are unavailable without a handler", async () => {
+  const hub = new CompanionHub("secret");
+  const port = await hub.listen(0);
+  try {
+    const res = await fetch(`http://127.0.0.1:${port}/sync/start`, { method: "POST", headers: { authorization: "Bearer secret" } });
+    assert.equal(res.status, 503);
+  } finally {
+    await hub.close();
+  }
+});

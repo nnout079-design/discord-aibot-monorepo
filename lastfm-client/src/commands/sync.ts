@@ -1,21 +1,9 @@
 import { ChatInputCommandInteraction, EmbedBuilder, SlashCommandBuilder } from "discord.js";
-import { createLastFmApi, LastFmApi } from "../lastfm/api";
-import { triggerBatch } from "../midi/bridge";
-import { pickBpm, stepSeconds } from "../midi/humanize";
-import { schedulePattern } from "../midi/schedule";
-import { createHit, PercussionHit, PERCUSSION_PATTERNS } from "../midi/world-percussion";
+import { createLastFmApi } from "../lastfm/api";
+import { PERCUSSION_PATTERNS } from "../midi/world-percussion";
 import { companionHub } from "../sync/companion-hub";
-import { EntryPlan, entryHits, notifyTargets, planEntry, songEntryEvent, SongStopEvent, TrackAttributes } from "../sync/entry";
-
-interface SyncSession {
-  plan: EntryPlan;
-  pattern: string | null;
-  track: TrackAttributes | null;
-  abort: AbortController;
-  timer: NodeJS.Timeout;
-}
-
-const sessions = new Map<string, SyncSession>();
+import { TrackAttributes } from "../sync/entry";
+import { armEntry, getSession, nowPlaying, stopEntry, SyncSession } from "../sync/session";
 
 export const data = new SlashCommandBuilder()
   .setName("sync")
@@ -35,30 +23,6 @@ export const data = new SlashCommandBuilder()
   .addSubcommand(command => command.setName("status").setDescription("Show the armed song entry"));
 
 const unix = (ms: number) => Math.floor(ms / 1000);
-
-async function nowPlaying(api: LastFmApi, username: string): Promise<TrackAttributes> {
-  const [track] = await api.getRecentTracks(username, 1);
-  if (!track || track["@attr"]?.nowplaying !== "true") throw new Error(`${username} is not scrobbling anything right now`);
-  const artist = track.artist["#text"];
-  const info = await api.getTrackInfo(track.name, artist).catch(() => undefined);
-  return {
-    name: track.name,
-    artist,
-    album: track.album?.["#text"] || info?.album,
-    url: track.url,
-    durationMs: info?.durationMs,
-    tags: info?.tags ?? []
-  };
-}
-
-function cancel(guildId: string): boolean {
-  const session = sessions.get(guildId);
-  if (!session) return false;
-  session.abort.abort();
-  clearTimeout(session.timer);
-  sessions.delete(guildId);
-  return true;
-}
 
 function describe(session: SyncSession): EmbedBuilder {
   const { plan, pattern, track } = session;
@@ -95,29 +59,16 @@ async function handleStart(interaction: ChatInputCommandInteraction, guildId: st
     }
   }
 
-  cancel(guildId);
-  const seed = process.env.HUMANIZE_SEED ?? "";
-  const bpm = interaction.options.getNumber("bpm") ?? pickBpm(seed);
-  const plan = planEntry(Date.now(), (interaction.options.getInteger("lead") ?? 8) * 1000, bpm, interaction.options.getInteger("beats") ?? 4);
-  const pattern = interaction.options.getString("pattern");
-  const patternHits = pattern
-    ? schedulePattern(PERCUSSION_PATTERNS[pattern].map(id => createHit(id)).filter((hit): hit is PercussionHit => hit !== undefined), seed, bpm).hits
-    : [];
-
-  const abort = new AbortController();
-  const timer = setTimeout(() => {
-    sessions.delete(guildId);
-    interaction.followUp(`Downbeat: ${track ? `${track.artist} - ${track.name}` : "song entry"} now.`).catch(() => {});
-  }, Math.max(0, plan.startAt - Date.now()));
-  const session: SyncSession = { plan, pattern, track, abort, timer };
-  sessions.set(guildId, session);
-
-  const hits = entryHits(plan, patternHits);
-  triggerBatch({ bpm, stepMs: stepSeconds(bpm) * 1000, hits }, 9, { startAt: plan.countInAt, signal: abort.signal })
-    .catch(error => console.error("Sync MIDI batch failed:", error));
-  const event = songEntryEvent(plan, pattern, track, Date.now(), { channel: 9, hits });
-  companionHub.publish(event);
-  await notifyTargets(event);
+  const session = await armEntry(guildId, {
+    bpm: interaction.options.getNumber("bpm") ?? undefined,
+    leadMs: (interaction.options.getInteger("lead") ?? 8) * 1000,
+    beatsPerBar: interaction.options.getInteger("beats") ?? 4,
+    pattern: interaction.options.getString("pattern"),
+    track,
+    onDownbeat: () => {
+      interaction.followUp(`Downbeat: ${track ? `${track.artist} - ${track.name}` : "song entry"} now.`).catch(() => {});
+    }
+  });
   await interaction.editReply({ embeds: [describe(session)] });
 }
 
@@ -131,17 +82,12 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
   }
 
   if (action === "stop") {
-    const stopped = cancel(guildId);
-    if (stopped) {
-      const event: SongStopEvent = { type: "song-stop", sentAt: Date.now() };
-      companionHub.publish(event);
-      await notifyTargets(event);
-    }
+    const stopped = await stopEntry(guildId);
     await interaction.reply(stopped ? "Song entry cancelled." : "No song entry is armed.");
     return;
   }
 
-  const session = sessions.get(guildId);
+  const session = getSession(guildId);
   if (!session) {
     await interaction.reply({ content: "No song entry is armed.", ephemeral: true });
     return;

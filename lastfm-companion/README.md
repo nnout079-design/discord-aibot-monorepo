@@ -22,6 +22,20 @@ npm run outputs           (lists MIDI outputs; set MIDI_OUTPUT to part of the na
 npm start
 ```
 
+## Start a song entry from your PC
+
+With `npm start` running, open a second PowerShell window in this folder:
+
+```
+npm run sync afrobeat          (pattern: afrobeat, tabla, darbuka or taiko)
+npm run sync taiko 120         (pattern and BPM)
+npm run sync afrobeat lead=4 beats=3 user=YOUR_LASTFM_NAME
+npm run sync                   (count-in only)
+npm run sync stop
+```
+
+This does the same as `/sync start` / `/sync stop` in Discord, so Discord isn't needed. It uses `BOT_URL` and `COMPANION_TOKEN` from `.env`.
+
 `MIDI_OUTPUT=none` logs the MIDI instead of sending it, which is useful for a first test. Set `MIDI_CLOCK=0` to send notes only.
 
 ## Electron app
