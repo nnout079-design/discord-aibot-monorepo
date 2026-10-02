@@ -34,6 +34,7 @@ window.sync.onEvent(event => {
 // Times in `local` are already converted to this PC's clock by the companion.
 function frame() {
   requestAnimationFrame(frame);
+  drawRigs(entry, Date.now());
   if (!entry) return;
   const { countInAt, startAt, endAt } = entry.local ?? entry;
   const { beatMs, beatsPerBar } = entry;

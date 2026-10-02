@@ -13,12 +13,14 @@
     "rig": "tsx src/rigcli.ts",
     "lakh": "tsx src/lakh.ts",
     "transcribe": "tsx src/transcribe.ts",
-    "studio": "tsx src/studio.ts"
+    "studio": "tsx src/studio.ts",
+    "lights": "tsx src/lightscli.ts"
   },
   "dependencies": {
     "@julusian/midi": "^3.8.1",
     "@tonejs/midi": "2.0.28",
     "dotenv": "^16.6.1",
+    "serialport": "^13.0.0",
     "tsx": "^4.23.15"
   },
   "devDependencies": {

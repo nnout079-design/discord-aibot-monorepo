@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { GALAXY_PALETTE, hexToRgb } from "../lights/show";
 import { run } from "./tools";
 
 export interface VideoPlan {
@@ -9,6 +10,37 @@ export interface VideoPlan {
   beatsPerBar: number;
   durationMs: number;
   entrances: { timeMs: number; labels: string[] }[];
+  /** Galaxy rig colours (#rrggbb) and 0-1 energy from the bot's light plan. */
+  palette?: string[];
+  energy?: number;
+}
+
+const BEAM_FILE = "beam.png";
+
+// Two galaxy light rigs on the stage floor, as in the companion's live show: beams a palette colour apart that
+// change colour every bar (every two bars for calmer songs), flare on each beat and sweep in mirror image.
+// Input 2 is a white beam sprite; each colour/brightness gets its own tinted copy, switched on by `enable`.
+export function galaxyBeams(plan: VideoPlan, input: string, output: string): string[] {
+  const palette = (plan.palette?.length ? plan.palette : GALAXY_PALETTE).map(hexToRgb);
+  const energy = plan.energy ?? 0.6;
+  const beat = 60 / plan.bpm;
+  const bar = beat * plan.beatsPerBar;
+  const step = bar * (energy >= 0.7 ? 1 : 2);
+  const sweep = (0.06 + 0.06 * energy).toFixed(3);
+  const layers = [0, 1].flatMap(rig => palette.flatMap((_, i) => [true, false].map(bright => ({ rig, i, bright }))));
+  const filters = [`[2:v]format=rgba,split=${layers.length}${layers.map((_, j) => `[s${j}]`).join("")}`];
+  let last = input;
+  layers.forEach(({ rig, i, bright }, j) => {
+    const [r, g, b] = palette[i];
+    const x = `W*${rig === 0 ? 0.2 : 0.8}-w/2${rig === 0 ? "+" : "-"}W*${sweep}*sin(PI*t/${(2 * bar).toFixed(5)})`;
+    const onBeat = `lt(mod(t,${beat.toFixed(5)}),${(beat * 0.3).toFixed(5)})`;
+    const enable = `eq(mod(floor(t/${step.toFixed(5)})+${rig},${palette.length}),${i})*${bright ? onBeat : `not(${onBeat})`}`;
+    const out = j === layers.length - 1 ? output : `[g${j}]`;
+    filters.push(`[s${j}]colorchannelmixer=rr=${r.toFixed(3)}:gg=${g.toFixed(3)}:bb=${b.toFixed(3)}:aa=${bright ? 0.9 : 0.4}[c${j}]`);
+    filters.push(`${last}[c${j}]overlay=x='${x}':y=H-h-300:eval=frame:shortest=1:enable='${enable}'${out}`);
+    last = out;
+  });
+  return filters;
 }
 
 const FONTS = [
@@ -83,7 +115,9 @@ export function videoFilter(plan: VideoPlan, font: string | null, dir: string): 
       `fontsize=28:box=1:boxcolor=black@0.45:boxborderw=12:x=(w-tw)/2:y=h-250:enable='between(t,${start},${end})'`);
   }).join("");
   return [
-    `[0:v]scale=1536:-2,zoompan=z='min(zoom+0.00015,1.25)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${frames}:s=1280x720:fps=30,format=yuv420p[bg]`,
+    `[0:v]scale=1536:-2,zoompan=z='min(zoom+0.00015,1.25)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${frames}:s=1280x720:fps=30,format=rgba[stage]`,
+    ...galaxyBeams(plan, "[stage]", "[lit]"),
+    `[lit]format=yuv420p[bg]`,
     `[1:a]showcqt=s=1280x300:fps=30:bar_v=12:sono_h=0:axis=0:bar_g=2[cqt]`,
     `[1:a]showwaves=s=1280x90:mode=cline:colors=white@0.8:rate=30[wave]`,
     `[bg][cqt]overlay=0:H-300:shortest=1[a]`,
@@ -104,6 +138,11 @@ export function makeVideo(audioPath: string, backdrop: string | null, plan: Vide
     fs.copyFileSync(fontSrc, path.join(dir, "font.ttf"));
     font = "font.ttf";
   }
+  run("ffmpeg", [
+    "-y", "-loglevel", "error", "-f", "lavfi", "-i", "color=c=white:s=360x720",
+    "-vf", "format=rgba,geq=r=255:g=255:b=255:a='255*exp(-pow((X-W/2)/(4+(H-Y)*0.1),2))*(0.2+0.8*Y/H)'",
+    "-frames:v", "1", BEAM_FILE
+  ], { cwd: dir });
   const filter = videoFilter(plan, font, dir);
   fs.writeFileSync(path.join(dir, "video-filter.txt"), filter);
   const bg = backdrop
@@ -111,9 +150,10 @@ export function makeVideo(audioPath: string, backdrop: string | null, plan: Vide
     : ["-f", "lavfi", "-i", "color=c=0x14102a:s=1536x1024:r=30"];
   run("ffmpeg", [
     "-y", "-loglevel", "error", ...bg, "-i", path.relative(dir, audioPath),
+    "-loop", "1", "-framerate", "30", "-i", BEAM_FILE,
     "-filter_complex_script", "video-filter.txt", "-map", "[v]", "-map", "1:a",
     "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p",
     "-c:a", "aac", "-b:a", "320k", "-shortest", path.basename(outPath)
   ], { cwd: dir });
-  for (const f of fs.readdirSync(dir)) if (/^(enter\d+|title|subtitle)\.txt$|^font\.ttf$|^video-filter\.txt$/.test(f)) fs.rmSync(path.join(dir, f));
+  for (const f of fs.readdirSync(dir)) if (/^(enter\d+|title|subtitle)\.txt$|^font\.ttf$|^video-filter\.txt$|^beam\.png$/.test(f)) fs.rmSync(path.join(dir, f));
 }

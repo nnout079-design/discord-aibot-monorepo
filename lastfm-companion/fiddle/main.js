@@ -8,8 +8,8 @@ let status = "Starting...";
 
 function createWindow() {
   win = new BrowserWindow({
-    width: 640,
-    height: 420,
+    width: 900,
+    height: 680,
     backgroundColor: "#111111",
     webPreferences: { preload: path.join(__dirname, "preload.js") }
   });

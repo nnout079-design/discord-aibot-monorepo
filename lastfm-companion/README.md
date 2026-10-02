@@ -5,7 +5,8 @@ Runs on your PC and plays `/sync` song entries from lastfm-client-bot on a local
 On each `/sync start` it:
 - plays the one-bar count-in and the chosen percussion pattern on the shared start timestamp,
 - sends MIDI clock from the count-in and MIDI Start on the downbeat (Stop on `/sync stop` or at the end of the track), so a DAW set to follow external MIDI clock comes in on time,
-- POSTs the event to `ELECTRON_URL`, if set, with `local.countInAt` / `local.startAt` converted to this PC's clock.
+- POSTs the event to `ELECTRON_URL`, if set, with `local.countInAt` / `local.startAt` converted to this PC's clock, plus the galaxy light `show`.
+- Drives two galaxy light rigs over DMX if `lights.json` exists (see [Galaxy light rigs](#galaxy-light-rigs)).
 
 Before scheduling, it matches its clock to the bot's (`/sync/time`, best of 8 round trips, refreshed every 5 minutes). Your PC's clock does not need to be exact.
 
@@ -104,3 +105,36 @@ Output goes to `studio\Artist - Title\`:
 - **Live studio**: `npm start` plays the same arrangement live across your MIDI ports. `mixxx\LastFM-Companion.midi.xml` lets Mixxx start deck 1 on the downbeat and stop it on `npm run sync stop` (MIDI port "Rig DJ").
 
 Every stem is rendered with the MuseScore General soundfont, so the full mix comes out even without a DAW or sample libraries.
+
+## Galaxy light rigs
+
+Two galaxy rigs (A and B) follow every song entry on the same timestamps as the MIDI: dim in their song colour before the count-in, white flashes on the count-in clicks, then from the downbeat a beat pulse (strongest on beat 1), a colour step every bar (every two bars for calmer songs, rig B one colour ahead of rig A), mirrored pan sweeps, and a one-beat white strobe whenever a rig section comes in. `song-stop`, the end of the song and Ctrl+C black them out. The bot picks the colours and energy from the song's Last.fm tags, danceability and tempo, and sends them as `lights` in the `song-entry` event.
+
+They run in three places:
+
+1. **DMX fixtures (this companion).** Create `lights.json` and check it:
+   ```
+   npm run lights -- --write
+   npm run lights ports
+   npm run lights
+   npm run lights test
+   ```
+   `ports` lists USB-DMX adapters, and `test` plays an 8-bar demo without the bot. In `lights.json`:
+   - `output`: `open-dmx` (FTDI cables such as Enttec Open DMX), `enttec-pro` (Enttec DMX USB Pro, DMXking), `artnet` (network node; set `host` and `universe`), `log` (prints the DMX values, no hardware) or `none`.
+   - `port`: the adapter's COM port, or `auto`.
+   - `fixtures`: one entry per light, with `name`, `rig` (0 = A, 1 = B), DMX start `address` and `profile`:
+
+     | profile | fixture | channels |
+     |---|---|---|
+     | `showtec-galaxy-360-18ch` | Showtec Galaxy 360, 18-channel mode | 18 |
+     | `showtec-galaxy-360-10ch` | Showtec Galaxy 360, 10-channel mode (colour presets) | 10 |
+     | `beamz-galaxy5-60ch` | beamZ Galaxy5 moving-head bar, 60-channel mode | 60 |
+     | `beamz-galaxy5-11ch` | beamZ Galaxy5, 11-channel mode | 11 |
+     | `rgbw-dimmer` | generic dimmer + R G B W | 5 |
+     | `rgb` | generic R G B | 3 |
+
+     Set the same channel mode and start address on the fixture's own display. `panRange` / `tiltRange` (e.g. `[0.3, 0.7]`) keep moving heads on stage, `invertPan` / `invertTilt` mirror them, and `latencyMs` sends frames early.
+
+   With `lights.json` present, `npm start` drives the fixtures; without it, lights are off.
+2. **Wi-Fi galaxy projectors (Tuya / Smart Life), from the bot.** Set `TUYA_ACCESS_ID`, `TUYA_ACCESS_SECRET`, `TUYA_REGION` and `TUYA_DEVICE_IDS` on lastfm-client-bot (see `lastfm-client/.env.example`). The bot reads each projector's functions (power, nebula colour, stars/laser, rotation) and sends a colour change every few bars.
+3. **On screen.** The Electron Fiddle window shows the two rigs as spinning galaxies with beams, and the AI-video studio (`npm run studio`) adds both rigs' beams to the music video.

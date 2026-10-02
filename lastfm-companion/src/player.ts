@@ -1,3 +1,4 @@
+import { LightPlan } from "./lights/show";
 import { Router, singleRouter } from "./router";
 import { moveIntoRange, Score } from "./score";
 
@@ -47,6 +48,7 @@ export interface SongEntryEvent {
   pattern: string | null;
   track: TrackInfo | null;
   midi?: { channel: number; hits: EntryHit[] };
+  lights?: LightPlan;
 }
 
 export interface LocalTimes {
