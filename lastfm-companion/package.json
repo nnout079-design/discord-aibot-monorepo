@@ -1,0 +1,22 @@
+{
+  "name": "lastfm-companion",
+  "version": "1.0.0",
+  "description": "PC companion for lastfm-client /sync: plays synced song entries on a local MIDI output",
+  "private": true,
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "tsx src/index.ts",
+    "outputs": "tsx src/index.ts --list",
+    "test": "node --import tsx --test src/*.test.ts"
+  },
+  "dependencies": {
+    "@julusian/midi": "^3.8.1",
+    "dotenv": "^16.6.1",
+    "tsx": "^4.23.15"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.43",
+    "typescript": "^5.9.3"
+  }
+}
