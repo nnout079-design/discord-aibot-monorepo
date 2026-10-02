@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { companionHub } from "./companion-hub";
 import { companionControl, getSession, COMPANION_SESSION, parseStartRequest } from "./session";
 
 test("parseStartRequest validates pattern and ranges", () => {
@@ -28,7 +29,15 @@ test("companionControl arms a bar-aligned entry and stops it", async () => {
 
     assert.deepEqual((await companionControl("stop", {})).body, { stopped: true });
     assert.equal(getSession(COMPANION_SESSION), undefined);
-    assert.deepEqual((await companionControl("stop", {})).body, { stopped: false });
+    const events: string[] = [];
+    const publish = companionHub.publish.bind(companionHub);
+    companionHub.publish = event => { events.push(event.type); publish(event); };
+    try {
+      assert.deepEqual((await companionControl("stop", {})).body, { stopped: false });
+    } finally {
+      companionHub.publish = publish;
+    }
+    assert.deepEqual(events, ["song-stop"]);
 
     assert.equal((await companionControl("start", { pattern: "polka" })).status, 400);
   } finally {

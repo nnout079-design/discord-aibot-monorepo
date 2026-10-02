@@ -53,16 +53,15 @@ function cancel(key: string): boolean {
   return true;
 }
 
-// Stops the entry armed under `key`, or every armed entry when no key is given.
+// Cancels the entry armed under `key` (or every armed entry) and always tells receivers to stop,
+// so an entry that is already playing past its downbeat stops too. Returns whether one was still armed.
 export async function stopEntry(key?: string): Promise<boolean> {
   const keys = key === undefined ? [...sessions.keys()] : [key];
-  const stopped = keys.map(cancel).some(Boolean);
-  if (stopped) {
-    const event: SongStopEvent = { type: "song-stop", sentAt: Date.now() };
-    companionHub.publish(event);
-    await notifyTargets(event);
-  }
-  return stopped;
+  const cancelled = keys.map(cancel).some(Boolean);
+  const event: SongStopEvent = { type: "song-stop", sentAt: Date.now() };
+  companionHub.publish(event);
+  await notifyTargets(event);
+  return cancelled;
 }
 
 export async function armEntry(key: string, options: EntryOptions = {}): Promise<SyncSession> {
