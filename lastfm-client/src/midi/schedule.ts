@@ -4,8 +4,7 @@ import { PercussionHit } from "./world-percussion";
 export interface ScheduledHit extends PercussionHit { offsetMs: number }
 export interface Batch { bpm: number; stepMs: number; hits: ScheduledHit[] }
 
-export function schedulePattern(hits: PercussionHit[], seed = process.env.HUMANIZE_SEED ?? ""): Batch {
-  const bpm = pickBpm(seed);
+export function schedulePattern(hits: PercussionHit[], seed = process.env.HUMANIZE_SEED ?? "", bpm = pickBpm(seed)): Batch {
   const step = stepSeconds(bpm);
   const stepMs = step * 1000;
   const humanizers = new Map<string, ReturnType<typeof makeHumanizer>>();

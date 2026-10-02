@@ -2,15 +2,17 @@
 import { Client, GatewayIntentBits } from 'discord.js';
 import * as percussionCommand from './commands/percussion';
 import * as lastfmCommand from './commands/lastfm';
+import * as syncCommand from './commands/sync';
 dotenv.config();
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
-const commands = [percussionCommand.data, lastfmCommand.data];
+const commands = [percussionCommand.data, lastfmCommand.data, syncCommand.data];
 client.once('ready', async () => {
   console.log('✓ Bot ready');
   try {
     await Promise.all(commands.map(command => client.application?.commands.create(command)));
     console.log('✓ Registered /percussion');
     console.log('✓ Registered /lastfm');
+    console.log('✓ Registered /sync');
   } catch (error) {
     console.error('Command registration failed:', error);
   }
@@ -23,6 +25,9 @@ client.on('interactionCreate', async interaction => {
     }
     if (interaction.commandName === lastfmCommand.data.name) {
       await lastfmCommand.execute(interaction);
+    }
+    if (interaction.commandName === syncCommand.data.name) {
+      await syncCommand.execute(interaction);
     }
   } catch (error) {
     console.error('Command failed:', error);

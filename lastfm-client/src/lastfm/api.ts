@@ -8,6 +8,8 @@ export interface LastFmTrack {
 	image?: string[];
 	playcount?: number;
 	listeners?: number;
+	durationMs?: number;
+	tags?: string[];
 }
 
 export interface LastFmUser {
@@ -90,7 +92,9 @@ export class LastFmApi {
 			url: trackData.url,
 			image: trackData.image?.map((img: any) => img['#text']),
 			playcount: parseInt(trackData.playcount),
-			listeners: parseInt(trackData.listeners)
+			listeners: parseInt(trackData.listeners),
+			durationMs: Number(trackData.duration) || undefined,
+			tags: trackData.toptags?.tag?.map((tag: any) => tag.name) ?? []
 		};
 	}
 
