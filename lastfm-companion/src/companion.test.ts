@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { parseSyncArgs } from "./args";
 import { bestSample } from "./clock";
 import { createSseParser } from "./events";
 import { LATE_MS, Player, SongEntryEvent } from "./player";
@@ -83,4 +84,16 @@ test("playback stops at the end of the track", () => {
   run(player, fake, 10_000, 13_100);
   assert.equal(player.active, false);
   assert.equal(fake.sent.filter(m => m.bytes[0] === 0xfc).length, 1);
+});
+
+test("parseSyncArgs reads pattern, bpm and options", () => {
+  assert.deepEqual(parseSyncArgs([]), { action: "start", body: {} });
+  assert.deepEqual(parseSyncArgs(["Afrobeat", "120", "lead=4", "beats=3", "user=rj"]), {
+    action: "start",
+    body: { pattern: "afrobeat", bpm: 120, lead: 4, beats: 3, username: "rj" }
+  });
+  assert.deepEqual(parseSyncArgs(["--bpm=98.5", "pattern=taiko"]), { action: "start", body: { bpm: 98.5, pattern: "taiko" } });
+  assert.deepEqual(parseSyncArgs(["stop"]), { action: "stop", body: {} });
+  assert.throws(() => parseSyncArgs(["lead=soon"]), /lead must be a number/);
+  assert.throws(() => parseSyncArgs(["volume=3"]), /Unknown option/);
 });

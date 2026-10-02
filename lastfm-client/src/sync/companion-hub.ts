@@ -5,7 +5,39 @@ import { SongEntryEvent, SongStopEvent } from "./entry";
 
 type HubEvent = SongEntryEvent | SongStopEvent;
 
+export interface ControlResult {
+  status: number;
+  body: object;
+}
+
+export type ControlHandler = (action: "start" | "stop", body: unknown) => Promise<ControlResult>;
+
+const MAX_BODY_BYTES = 4096;
+
 const sha256 = (value: string) => crypto.createHash("sha256").update(value).digest();
+
+function sendJson(res: http.ServerResponse, status: number, body: object): void {
+  res.writeHead(status, { "content-type": "application/json", "cache-control": "no-store" });
+  res.end(JSON.stringify(body));
+}
+
+function readBody(req: http.IncomingMessage): Promise<string> {
+  return new Promise((resolve, reject) => {
+    let size = 0;
+    const chunks: Buffer[] = [];
+    req.on("data", (chunk: Buffer) => {
+      size += chunk.length;
+      if (size > MAX_BODY_BYTES) {
+        reject(new Error("body too large"));
+        req.destroy();
+        return;
+      }
+      chunks.push(chunk);
+    });
+    req.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
+    req.on("error", reject);
+  });
+}
 
 function writeEvent(res: http.ServerResponse, event: HubEvent): void {
   res.write(`event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`);
@@ -13,11 +45,13 @@ function writeEvent(res: http.ServerResponse, event: HubEvent): void {
 
 // Companions on users' PCs connect out to GET /sync/events (Server-Sent Events) and
 // align their clocks with GET /sync/time, so they never need a public URL of their own.
+// POST /sync/start and /sync/stop let a companion arm or stop an entry without Discord.
 export class CompanionHub {
   private clients = new Set<http.ServerResponse>();
   private armed: SongEntryEvent | null = null;
   private server = http.createServer((req, res) => this.handle(req, res));
   private ping: NodeJS.Timeout | null = null;
+  private control: ControlHandler | null = null;
 
   constructor(private tokenOverride?: string) {}
 
@@ -42,6 +76,10 @@ export class CompanionHub {
     return new Promise(resolve => this.server.close(() => resolve()));
   }
 
+  setControl(handler: ControlHandler): void {
+    this.control = handler;
+  }
+
   publish(event: HubEvent): void {
     this.armed = event.type === "song-entry" ? event : null;
     this.clients.forEach(res => writeEvent(res, event));
@@ -53,8 +91,42 @@ export class CompanionHub {
     return crypto.timingSafeEqual(sha256(given), sha256(this.token));
   }
 
+  private async handleControl(action: "start" | "stop", req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
+    if (!this.token) {
+      sendJson(res, 503, { error: "COMPANION_TOKEN is not configured on the bot" });
+      return;
+    }
+    if (!this.authorized(req)) {
+      sendJson(res, 401, { error: "unauthorized" });
+      return;
+    }
+    if (!this.control) {
+      sendJson(res, 503, { error: "sync control is not available" });
+      return;
+    }
+    let body: unknown;
+    try {
+      const text = await readBody(req);
+      body = text.trim() ? JSON.parse(text) : {};
+    } catch (error) {
+      sendJson(res, 400, { error: error instanceof Error ? error.message : "invalid body" });
+      return;
+    }
+    try {
+      const result = await this.control(action, body);
+      sendJson(res, result.status, result.body);
+    } catch (error) {
+      console.error(`Companion /sync/${action} failed:`, error);
+      sendJson(res, 500, { error: "sync control failed" });
+    }
+  }
+
   private handle(req: http.IncomingMessage, res: http.ServerResponse): void {
     const { pathname } = new URL(req.url ?? "/", "http://hub");
+    if (req.method === "POST" && (pathname === "/sync/start" || pathname === "/sync/stop")) {
+      void this.handleControl(pathname === "/sync/start" ? "start" : "stop", req, res);
+      return;
+    }
     if (req.method !== "GET") {
       res.writeHead(405).end();
       return;

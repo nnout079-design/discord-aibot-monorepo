@@ -8,6 +8,7 @@
     "build": "tsc",
     "start": "tsx src/index.ts",
     "outputs": "tsx src/index.ts --list",
+    "sync": "tsx src/trigger.ts",
     "test": "node --import tsx --test src/*.test.ts"
   },
   "dependencies": {
