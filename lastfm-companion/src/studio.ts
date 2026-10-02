@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { Arranger } from "./arranger";
 import { SongEntryEvent } from "./player";
+import { LightPlan } from "./lights/show";
 import { loadRig } from "./rig";
 import { entrances, scoreToMidi, sectionsByGroup } from "./studio/midifile";
 import { liveRigScript, sessionScript } from "./studio/reaper";
@@ -69,7 +70,7 @@ export function parseStudioArgs(argv: string[]): StudioArgs {
 }
 
 // Song details (tags, length, tempo) from the bot's Last.fm lookup; falls back to just the name.
-async function lookup(args: StudioArgs): Promise<{ track: Track; bpm: number | null }> {
+async function lookup(args: StudioArgs): Promise<{ track: Track; bpm: number | null; lights?: LightPlan }> {
   const token = process.env.COMPANION_TOKEN;
   const botUrl = (process.env.BOT_URL ?? "https://lastfm-client-bot.fly.dev").replace(/\/$/, "");
   const fallback = { track: { artist: args.artist ?? "", name: args.title ?? "", tags: [] }, bpm: null };
@@ -84,9 +85,9 @@ async function lookup(args: StudioArgs): Promise<{ track: Track; bpm: number | n
       body: JSON.stringify(args.username ? { username: args.username } : { artist: args.artist, title: args.title }),
       signal: AbortSignal.timeout(15000)
     });
-    const json = await response.json() as { track?: Track; bpm?: number | null; error?: string };
+    const json = await response.json() as { track?: Track; bpm?: number | null; lights?: LightPlan; error?: string };
     if (!response.ok || !json.track) throw new Error(json.error ?? `bot returned ${response.status}`);
-    return { track: json.track, bpm: json.bpm ?? null };
+    return { track: json.track, bpm: json.bpm ?? null, lights: json.lights };
   } catch (error) {
     if (args.username) throw error;
     console.log(`Last.fm lookup failed (${error instanceof Error ? error.message : error}); using the name only.`);
@@ -111,7 +112,7 @@ async function render(args: StudioArgs): Promise<void> {
   const rig = loadRig(process.env.RIG_FILE ?? "rig.json");
   const log = (message: string) => console.log(message);
   const arranger = new Arranger(rig, { songsDir: process.env.SONGS_DIR ?? "songs", generate: true, allStyles: args.allStyles, log });
-  const { track, bpm: botBpm } = await lookup(args);
+  const { track, bpm: botBpm, lights } = await lookup(args);
   const title = `${track.artist} - ${track.name}`;
   const fileTempo = args.bpm === undefined ? arranger.tempoFor(track.artist, track.name, track.durationMs) : null;
   const bpm = args.bpm ?? fileTempo?.bpm ?? botBpm ?? 120;
@@ -171,7 +172,8 @@ async function render(args: StudioArgs): Promise<void> {
     makeVideo(master ?? mix, backdrop, {
       title,
       subtitle: songFacts(track, score.source === "generated" ? "Generated arrangement" : `From ${score.source} MIDI`, bpm, score.sections.length),
-      bpm, beatsPerBar, durationMs: score.durationMs, entrances: entrances(rig, score)
+      bpm, beatsPerBar, durationMs: score.durationMs, entrances: entrances(rig, score),
+      palette: lights?.palette, energy: lights?.energy
     }, path.join(dir, "video.mp4"));
     console.log(`done: ${path.join(dir, "video.mp4")}`);
   }

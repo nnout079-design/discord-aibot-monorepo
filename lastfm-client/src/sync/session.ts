@@ -1,4 +1,6 @@
 import { createLastFmApi, LastFmApi } from "../lastfm/api";
+import { lightPlan } from "../lights/palette";
+import { GalaxyProjectors } from "../lights/tuya";
 import { triggerBatch } from "../midi/bridge";
 import { pickBpm, stepSeconds } from "../midi/humanize";
 import { schedulePattern } from "../midi/schedule";
@@ -25,6 +27,8 @@ export interface EntryOptions {
 }
 
 const sessions = new Map<string, SyncSession>();
+const projectors = GalaxyProjectors.fromEnv();
+if (projectors) console.log("Galaxy projectors: Tuya cloud control on");
 
 export async function nowPlaying(api: LastFmApi, username: string): Promise<TrackAttributes> {
   const [track] = await api.getRecentTracks(username, 1);
@@ -69,6 +73,7 @@ function cancel(key: string): boolean {
 export async function stopEntry(key?: string): Promise<boolean> {
   const keys = key === undefined ? [...sessions.keys()] : [key];
   const cancelled = keys.map(cancel).some(Boolean);
+  projectors?.stop();
   const event: SongStopEvent = { type: "song-stop", sentAt: Date.now() };
   companionHub.publish(event);
   await notifyTargets(event);
@@ -102,7 +107,9 @@ export async function armEntry(key: string, options: EntryOptions = {}): Promise
   const hits = entryHits(plan, patternHits);
   triggerBatch({ bpm, stepMs: stepSeconds(bpm) * 1000, hits }, 9, { startAt: plan.countInAt, signal: abort.signal })
     .catch(error => console.error("Sync MIDI batch failed:", error));
-  const event = songEntryEvent(plan, pattern, track, Date.now(), { channel: 9, hits });
+  const lights = lightPlan(track, bpm);
+  projectors?.play(plan, lights, track?.durationMs);
+  const event = songEntryEvent(plan, pattern, track, Date.now(), { channel: 9, hits }, lights);
   companionHub.publish(event);
   await notifyTargets(event);
   return session;
@@ -206,7 +213,7 @@ async function companionNowPlaying(body: unknown): Promise<{ status: number; bod
     const track = request.artist && request.title
       ? api ? await trackInfo(api, request.artist, request.title) : await enrichTrack(null, { name: request.title, artist: request.artist, tags: [] })
       : await nowPlaying(api!, request.username!);
-    return { status: 200, body: { track, bpm: track.bpm ?? null } };
+    return { status: 200, body: { track, bpm: track.bpm ?? null, lights: lightPlan(track, track.bpm ?? 120) } };
   } catch (error) {
     return { status: 422, body: { error: error instanceof Error ? error.message : "Could not read now playing from Last.fm" } };
   }

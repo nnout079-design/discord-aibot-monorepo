@@ -9,13 +9,16 @@
              background: #111; color: #eee; font-family: system-ui, sans-serif; user-select: none; }
       #flash { position: fixed; inset: 0; background: #fff; opacity: 0; pointer-events: none; }
       #label { font-size: 22px; letter-spacing: 0.1em; text-transform: uppercase; color: #999; }
-      #big { font-size: 140px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; }
+      #big { font-size: 110px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; }
       #track { font-size: 20px; }
       #bpm, #status { font-size: 14px; color: #777; margin-top: 6px; }
       #status { position: fixed; bottom: 10px; }
       #source { font-size: 14px; color: #aaa; margin-top: 14px; }
       #sections { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; max-width: 90vw; margin-top: 8px; }
       #sections span { font-size: 12px; padding: 3px 8px; border-radius: 10px; background: #222; color: #888; }
+      #rigs { display: flex; gap: 12px; margin-top: 14px; }
+      #rigs figure { margin: 0; text-align: center; font-size: 12px; color: #777; }
+      #rigs canvas { display: block; border-radius: 8px; background: #05030f; }
       #sections.live span { background: rgba(255, 51, 85, calc(0.15 + 0.5 * var(--pulse, 0))); color: #fff; }
     </style>
   </head>
@@ -27,7 +30,12 @@
     <div id="bpm"></div>
     <div id="source"></div>
     <div id="sections"></div>
+    <div id="rigs">
+      <figure><canvas id="rigA" width="400" height="220"></canvas>Galaxy A</figure>
+      <figure><canvas id="rigB" width="400" height="220"></canvas>Galaxy B</figure>
+    </div>
     <div id="status"></div>
+    <script src="./galaxy.js"></script>
     <script src="./renderer.js"></script>
   </body>
 </html>
