@@ -48,4 +48,16 @@ When `ELECTRON_URL` is set (e.g. `http://127.0.0.1:3030/sync`), each event is PO
 
 Schedule against `local.startAt` with `Date.now()` in the Electron app.
 
+### Ready-made receiver (Electron Fiddle)
+
+`fiddle/` is a small Electron app that listens on `http://127.0.0.1:3030/sync` and shows the count-in, then bar.beat with a flash on every beat (red on the downbeat).
+
+1. In Electron Fiddle, choose **File > Open** (Ctrl+O), pick the `lastfm-companion\fiddle` folder, then click **Run**.
+2. Add the address to `.env` and restart the companion:
+   ```
+   Add-Content .env "ELECTRON_URL=http://127.0.0.1:3030/sync"
+   npm start
+   ```
+3. Run `npm run sync afrobeat` in a second window.
+
 Timing is limited by the OS timer resolution (a few ms on most PCs).
