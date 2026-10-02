@@ -4,7 +4,8 @@ import { triggerBatch } from "../midi/bridge";
 import { pickBpm, stepSeconds } from "../midi/humanize";
 import { schedulePattern } from "../midi/schedule";
 import { createHit, PercussionHit, PERCUSSION_PATTERNS } from "../midi/world-percussion";
-import { EntryPlan, entryHits, notifyTargets, planEntry, songEntryEvent, TrackAttributes } from "../sync/entry";
+import { companionHub } from "../sync/companion-hub";
+import { EntryPlan, entryHits, notifyTargets, planEntry, songEntryEvent, SongStopEvent, TrackAttributes } from "../sync/entry";
 
 interface SyncSession {
   plan: EntryPlan;
@@ -69,7 +70,8 @@ function describe(session: SyncSession): EmbedBuilder {
       { name: "Downbeat", value: `<t:${unix(plan.startAt)}:T> (<t:${unix(plan.startAt)}:R>)`, inline: true },
       { name: "Tempo", value: `${plan.bpm.toFixed(2)} BPM, ${plan.beatsPerBar}/4`, inline: true },
       { name: "Pattern", value: pattern ?? "count-in only", inline: true },
-      { name: "Start timestamp", value: `\`${Math.round(plan.startAt)}\` ms`, inline: true }
+      { name: "Start timestamp", value: `\`${Math.round(plan.startAt)}\` ms`, inline: true },
+      { name: "PC companions", value: `${companionHub.connected} connected`, inline: true }
     );
   if (track?.tags.length) embed.addFields({ name: "Tags", value: track.tags.slice(0, 5).join(", "), inline: true });
   return embed;
@@ -110,9 +112,12 @@ async function handleStart(interaction: ChatInputCommandInteraction, guildId: st
   const session: SyncSession = { plan, pattern, track, abort, timer };
   sessions.set(guildId, session);
 
-  triggerBatch({ bpm, stepMs: stepSeconds(bpm) * 1000, hits: entryHits(plan, patternHits) }, 9, { startAt: plan.countInAt, signal: abort.signal })
+  const hits = entryHits(plan, patternHits);
+  triggerBatch({ bpm, stepMs: stepSeconds(bpm) * 1000, hits }, 9, { startAt: plan.countInAt, signal: abort.signal })
     .catch(error => console.error("Sync MIDI batch failed:", error));
-  await notifyTargets(songEntryEvent(plan, pattern, track));
+  const event = songEntryEvent(plan, pattern, track, Date.now(), { channel: 9, hits });
+  companionHub.publish(event);
+  await notifyTargets(event);
   await interaction.editReply({ embeds: [describe(session)] });
 }
 
@@ -127,7 +132,11 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
   if (action === "stop") {
     const stopped = cancel(guildId);
-    if (stopped) await notifyTargets({ type: "song-stop", sentAt: Date.now() });
+    if (stopped) {
+      const event: SongStopEvent = { type: "song-stop", sentAt: Date.now() };
+      companionHub.publish(event);
+      await notifyTargets(event);
+    }
     await interaction.reply(stopped ? "Song entry cancelled." : "No song entry is armed.");
     return;
   }

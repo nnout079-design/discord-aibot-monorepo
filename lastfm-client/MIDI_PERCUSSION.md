@@ -47,3 +47,7 @@ Without `MIDI_BRIDGE_URL`, the bot logs the trigger, which is useful for develop
 ```
 
 `/sync stop` sends `{ "type": "song-stop", "sentAt": ... }`. Without `SYNC_TARGETS`, the event is logged instead.
+
+## PC companion
+
+`lastfm-companion/` runs on your PC, connects out to this bot, and plays `/sync` entries on a local MIDI output, with MIDI clock and Start/Stop. It can also forward the entries to a local Electron app. The bot serves `GET /sync/time` (public) and `GET /sync/events` (Server-Sent Events, `Authorization: Bearer $COMPANION_TOKEN`). Song-entry events include `midi: { channel, hits }`. `/companion` (Manage Server only) privately shows the `.env` lines. See `lastfm-companion/README.md`.

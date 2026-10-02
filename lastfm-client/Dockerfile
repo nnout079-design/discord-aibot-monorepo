@@ -19,6 +19,8 @@ RUN addgroup -g 1001 lastfmuser && \
 USER lastfmuser
 
 ENV NODE_ENV=production
+ENV PORT=8080
+EXPOSE 8080
 
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
     CMD node -e "process.exit(0)" || exit 1

@@ -31,6 +31,7 @@ export interface SongEntryEvent {
   beatsPerBar: number;
   pattern: string | null;
   track: TrackAttributes | null;
+  midi?: { channel: number; hits: ScheduledHit[] };
 }
 
 export interface SongStopEvent {
@@ -60,8 +61,14 @@ export function entryHits(plan: EntryPlan, pattern: ScheduledHit[] = []): Schedu
   return [...clicks, ...pattern.map(hit => ({ ...hit, offsetMs: plan.barMs + hit.offsetMs }))];
 }
 
-export function songEntryEvent(plan: EntryPlan, pattern: string | null, track: TrackAttributes | null, sentAt = Date.now()): SongEntryEvent {
-  return { type: "song-entry", sentAt, ...plan, pattern, track };
+export function songEntryEvent(
+  plan: EntryPlan,
+  pattern: string | null,
+  track: TrackAttributes | null,
+  sentAt = Date.now(),
+  midi?: SongEntryEvent["midi"]
+): SongEntryEvent {
+  return { type: "song-entry", sentAt, ...plan, pattern, track, ...(midi && { midi }) };
 }
 
 export async function notifyTargets(event: SongEntryEvent | SongStopEvent, targets = process.env.SYNC_TARGETS ?? ""): Promise<void> {
