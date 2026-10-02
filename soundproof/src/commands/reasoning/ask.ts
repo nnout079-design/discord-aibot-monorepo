@@ -5,7 +5,7 @@ import { isCoworker } from "../../security/coworkers";
 const reasoner = new HybridReasoner();
 
 export const data = new SlashCommandBuilder()
-  .setName("ask")
+  .setName("reason")
   .setDescription("Ask Claude a complex question")
   .addStringOption(option =>
     option
