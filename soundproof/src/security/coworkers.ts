@@ -1,6 +1,6 @@
 import { User } from "discord.js";
 
-const configuredNames = (process.env.COWORKER_DISCORD_USERNAMES ?? "Conen")
+const configuredNames = (process.env.COWORKER_DISCORD_USERNAMES ?? "")
   .split(",")
   .map(name => name.trim().toLowerCase())
   .filter(Boolean);

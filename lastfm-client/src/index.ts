@@ -1,6 +1,39 @@
 ﻿import * as dotenv from 'dotenv';
 import { Client, GatewayIntentBits } from 'discord.js';
+import * as percussionCommand from './commands/percussion';
+import * as lastfmCommand from './commands/lastfm';
+import * as countdownCommand from './commands/countdown';
 dotenv.config();
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
-client.once('ready', () => console.log('✓ Bot ready'));
+const commands = [percussionCommand.data, lastfmCommand.data, countdownCommand.data];
+client.once('ready', async () => {
+  console.log('✓ Bot ready');
+  try {
+    await client.application?.commands.set(commands);
+    console.log('✓ Registered /percussion');
+    console.log('✓ Registered /lastfm');
+    console.log('✓ Registered /countdown');
+  } catch (error) {
+    console.error('Command registration failed:', error);
+  }
+});
+client.on('interactionCreate', async interaction => {
+  if (!interaction.isChatInputCommand()) return;
+  try {
+    if (interaction.commandName === percussionCommand.data.name) {
+      await percussionCommand.execute(interaction);
+    }
+    if (interaction.commandName === lastfmCommand.data.name) {
+      await lastfmCommand.execute(interaction);
+    }
+    if (interaction.commandName === countdownCommand.data.name) {
+      await countdownCommand.execute(interaction);
+    }
+  } catch (error) {
+    console.error('Command failed:', error);
+    const msg = { content: 'Command failed.', ephemeral: true };
+    if (interaction.deferred || interaction.replied) await interaction.followUp(msg).catch(() => {});
+    else await interaction.reply(msg).catch(() => {});
+  }
+});
 client.login(process.env.DISCORD_TOKEN);
