@@ -7,7 +7,7 @@ const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 const commands = [askCommand.data, helpCommand.data];
 client.once('ready', async () => {
 	console.log('✓ Bot ready');
-	await client.application?.commands.set(commands);
+	await Promise.all(commands.map(command => client.application?.commands.create(command)));
 	console.log('✓ Registered /ask');
 	console.log('✓ Registered /help');
 });

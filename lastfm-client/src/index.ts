@@ -9,7 +9,7 @@ const commands = [percussionCommand.data, lastfmCommand.data, countdownCommand.d
 client.once('ready', async () => {
   console.log('✓ Bot ready');
   try {
-    await client.application?.commands.set(commands);
+    await Promise.all(commands.map(command => client.application?.commands.create(command)));
     console.log('✓ Registered /percussion');
     console.log('✓ Registered /lastfm');
     console.log('✓ Registered /countdown');
