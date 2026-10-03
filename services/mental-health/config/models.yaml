@@ -1,0 +1,25 @@
+crisis:
+  task: text-classification
+  model_id: Akashpaul123/modernbert-crisis-detection
+  description: Binary crisis / safe classifier fine-tuned from ModernBERT-base.
+  threshold: 0.5
+  enabled: true
+
+emotion:
+  task: text-classification
+  model_id: cirimus/modernbert-large-go-emotions
+  description: 28-label multi-label emotion classifier fine-tuned from ModernBERT-large.
+  threshold: 0.5
+  enabled: true
+
+embedding:
+  task: feature-extraction
+  model_id: answerdotai/ModernBERT-large
+  description: General-domain ModernBERT-large encoder used for text embeddings.
+  enabled: false
+
+mental_embedding:
+  task: feature-extraction
+  model_id: AIMH/mental-bert-large-uncased
+  description: Mental-health-domain BERT-large encoder used for specialized embeddings.
+  enabled: false

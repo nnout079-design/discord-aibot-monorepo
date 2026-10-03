@@ -3,11 +3,12 @@ import { Client, GatewayIntentBits } from 'discord.js';
 import * as askCommand from './commands/reasoning/ask';
 import * as streamCommand from './commands/streaming/stream';
 import * as gameCommand from './commands/gaming/game';
+import * as wellnessCommand from './commands/wellness';
 import { attachGameReactionClient, startCompanionServer } from './streaming/companion-server';
 dotenv.config();
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates] });
 
-const commands = [askCommand.data, streamCommand.data, gameCommand.data];
+const commands = [askCommand.data, streamCommand.data, gameCommand.data, wellnessCommand.data];
 attachGameReactionClient(client);
 startCompanionServer();
 
@@ -26,6 +27,7 @@ client.on('interactionCreate', async interaction => {
 	if (interaction.commandName === askCommand.data.name) await askCommand.execute(interaction);
 	if (interaction.commandName === streamCommand.data.name) await streamCommand.execute(interaction);
 	if (interaction.commandName === gameCommand.data.name) await gameCommand.execute(interaction);
+	if (interaction.commandName === wellnessCommand.data.name) await wellnessCommand.execute(interaction);
 });
 
 const discordToken = process.env.DISCORD_BOT_TOKEN ?? process.env.DISCORD_TOKEN;

@@ -1,9 +1,10 @@
 ﻿import * as dotenv from 'dotenv';
 import { Client, GatewayIntentBits } from 'discord.js';
 import * as airhornCommand from './commands/airhorn';
+import * as wellnessCommand from './commands/wellness';
 dotenv.config();
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
-const commands = [airhornCommand.data];
+const commands = [airhornCommand.data, wellnessCommand.data];
 client.once('ready', async () => {
 	console.log('✓ Bot ready');
 	await Promise.all(commands.map(command => client.application?.commands.create(command)));
@@ -14,6 +15,9 @@ client.on('interactionCreate', async interaction => {
 	
 	if (interaction.commandName === airhornCommand.data.name) {
 		await airhornCommand.execute(interaction);
+	}
+	if (interaction.commandName === wellnessCommand.data.name) {
+		await wellnessCommand.execute(interaction);
 	}
 });
 client.login(process.env.DISCORD_TOKEN);

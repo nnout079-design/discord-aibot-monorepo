@@ -1,0 +1,25 @@
+{
+  "critical": [
+    "988 Suicide & Crisis Lifeline (US): call or text 988",
+    "Crisis Text Line (US): text HOME to 741741",
+    "Emergency services: call 911 (US) or your local emergency number"
+  ],
+  "high": [
+    "988 Suicide & Crisis Lifeline (US): call or text 988",
+    "Crisis Text Line (US): text HOME to 741741",
+    "SAMHSA National Helpline: 1-800-662-HELP (4357)"
+  ],
+  "moderate": [
+    "Crisis Text Line (US): text HOME to 741741",
+    "Psychology Today therapist finder: psychologytoday.com/us/therapists",
+    "NAMI HelpLine: 1-800-950-NAMI (6264)"
+  ],
+  "low": [
+    "Mental Health America screening tools: mhascreening.org",
+    "NAMI resources: nami.org/help"
+  ],
+  "general": [
+    "988 Suicide & Crisis Lifeline (US): call or text 988",
+    "Crisis Text Line (US): text HOME to 741741"
+  ]
+}

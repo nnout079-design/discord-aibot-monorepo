@@ -278,6 +278,37 @@
       - discord-network
       - database-network
 
+  # Mental Health Inference Service
+  mental-health:
+    image: discord-mental-health-service:latest
+    container_name: mental-health-service
+    build: ./services/mental-health
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      - HF_HOME=/app/.cache/huggingface
+      - MODEL_CATALOG_PATH=/app/config/models.yaml
+      - RESOURCES_PATH=/app/config/resources.json
+      - CRISIS_THRESHOLD=0.5
+      - EMOTION_THRESHOLD=0.5
+      - DEVICE=cpu
+      - USE_ONNX=false
+    volumes:
+      - mental_health_cache:/app/.cache/huggingface
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+        reservations:
+          cpus: '1.0'
+          memory: 2G
+    networks:
+      - discord-network
+
   # Monitoring Services (for Phase 4)
   prometheus:
     image: prom/prometheus:latest
@@ -339,6 +370,7 @@ volumes:
   postgres_data:
   redis_data:
   mongo_data:
+  mental_health_cache:
   prometheus_data:
   grafana_data:
 

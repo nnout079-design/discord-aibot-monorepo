@@ -1,8 +1,15 @@
 import { ChatInputCommandInteraction, SlashCommandBuilder } from "discord.js";
 import { HybridReasoner } from "../../reasoning/reasoning";
+import { MentalHealthClient } from "../../reasoning/engines/mental-health-client";
 import { isCoworker } from "../../security/coworkers";
 
 const reasoner = new HybridReasoner();
+
+function getMentalHealthClient(): MentalHealthClient | undefined {
+  const baseUrl = process.env.MENTAL_HEALTH_URL;
+  if (!baseUrl) return undefined;
+  return new MentalHealthClient({ baseUrl, timeoutMs: 30_000 });
+}
 
 export const data = new SlashCommandBuilder()
   .setName("reason")
@@ -27,6 +34,33 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     await interaction.deferReply();
 
     const question = interaction.options.getString("question", true);
+
+    // Safety guardrail: screen for mental-health distress before sending to Claude.
+    const mentalHealth = getMentalHealthClient();
+    if (mentalHealth) {
+      const screening = await mentalHealth.analyze(question, {
+        includeCrisis: true,
+        includeEmotion: true,
+        includeTriage: true,
+        includeEmbedding: false,
+      });
+
+      if (screening.crisis?.is_crisis) {
+        const embed = {
+          title: "Mental Health Support",
+          color: 0xe74c3c,
+          fields: [
+            { name: "Detected risk level", value: `${screening.crisis.severity} (${(screening.crisis.confidence * 100).toFixed(1)}%)` },
+            { name: "Support resources", value: screening.triage?.suggested_resources.join("\n") || "Please contact local emergency services or a mental health professional." },
+            { name: "Note", value: screening.disclaimer },
+          ],
+          timestamp: new Date().toISOString()
+        };
+        await interaction.editReply({ embeds: [embed] });
+        return;
+      }
+    }
+
     const result = await reasoner.reason(question);
     const fields = [
       {
