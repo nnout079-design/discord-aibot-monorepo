@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Deploy every Fly.io app in the monorepo.
 # Usage: ./deploy-fly.sh [app]
-# Example: ./deploy-fly.sh mental-health
+# Example: ./deploy-fly.sh services/mental-health
 
 APPS=(
   "services/mental-health"
@@ -21,10 +21,10 @@ if [ $# -eq 1 ]; then
     exit 1
   fi
   echo "Deploying ${app}..."
-  fly deploy --config "${app}/fly.toml" "${app}"
+  (cd "${app}" && fly deploy)
 else
   for app in "${APPS[@]}"; do
     echo "Deploying ${app}..."
-    fly deploy --config "${app}/fly.toml" "${app}"
+    (cd "${app}" && fly deploy)
   done
 fi
