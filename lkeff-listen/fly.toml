@@ -1,8 +1,14 @@
-app = "lkeff-listen-bot"
-primary_region = "iad"
+app = 'lkeff-listen-bot'
+primary_region = 'iad'
 
 [build]
-builder = "paketobuildpacks/builder:base"
+  dockerfile = 'Dockerfile'
 
 [env]
-NODE_ENV = "production"
+  NODE_ENV = 'production'
+  MENTAL_HEALTH_URL = 'https://discord-mental-health-service.fly.dev'
+
+[[vm]]
+  cpu_kind = 'shared'
+  cpus = 1
+  memory_mb = 512

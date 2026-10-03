@@ -120,3 +120,67 @@ cd ../lastfm-client && npm run build
 cd ../services/mental-health
 python -m compileall src training
 ```
+
+## Deploying to Fly.io
+
+A `fly.toml` is provided for every service/bot:
+
+- `services/mental-health/fly.toml`
+- `discord-aibot/fly.toml`
+- `soundproof/fly.toml`
+- `lkeff-listen/fly.toml`
+- `airhornbot/fly.toml`
+- `lastfm-client/fly.toml`
+
+### One-time setup
+
+1. Install `flyctl` and authenticate:
+
+```bash
+fly auth login
+```
+
+2. Create each Fly app (or run `fly launch --no-deploy` once per app):
+
+```bash
+fly apps create discord-mental-health-service
+fly apps create discord-aibot
+fly apps create discord-soundproof-bot
+fly apps create discord-lkeff-listen-bot
+fly apps create discord-airhornbot
+fly apps create discord-lastfm-client
+```
+
+3. Set secrets per app. At minimum each bot needs `DISCORD_TOKEN` and, where applicable, `CLAUDE_API_KEY` or `LASTFM_API_KEY`:
+
+```bash
+fly secrets set DISCORD_TOKEN=xxx -a discord-aibot
+fly secrets set CLAUDE_API_KEY=xxx -a discord-aibot
+```
+
+For the mental-health service you can optionally set `HF_TOKEN` if you use gated models.
+
+### Deploy manually
+
+```bash
+# Deploy a single app
+fly deploy --config services/mental-health/fly.toml services/mental-health
+
+# Deploy all apps
+./deploy-fly.sh
+```
+
+### Deploy via GitHub Actions
+
+Add a repository secret named `FLY_API_TOKEN` (create with `fly tokens create deploy -x 999999h`).
+Pushes to `main` or `master` will automatically deploy all apps via `.github/workflows/deploy-fly.yml`.
+
+### Internal service URL
+
+Discord bots reference the mental-health service via HTTPS in production:
+
+```env
+MENTAL_HEALTH_URL=https://discord-mental-health-service.fly.dev
+```
+
+Each `fly.toml` sets this default. Update it if you choose a different app name.
