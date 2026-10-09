@@ -7,7 +7,7 @@ param(
     [string]$DiscordToken
 )
 
-cd E:\discord-aibot-monorepo
+Set-Location E:\discord-aibot-monorepo
 
 Write-Host "🔐 Setting Discord token for all bots..." -ForegroundColor Cyan
 
