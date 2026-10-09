@@ -61,3 +61,46 @@ class EmbedRequest(BaseModel):
 class HealthResponse(BaseModel):
     status: str
     loaded_models: list[str]
+
+
+class FillMaskPrediction(BaseModel):
+    token: str
+    word: str
+    score: float
+
+
+class FillMaskRequest(BaseModel):
+    text: str = Field(..., min_length=1, max_length=512, description="Text containing the [MASK] token.")
+    top_k: int = Field(5, ge=1, le=20, description="Number of predictions to return.")
+
+
+class FillMaskResult(BaseModel):
+    model: str
+    predictions: list[FillMaskPrediction]
+
+
+class Entity(BaseModel):
+    word: str
+    label: str
+    score: float = 1.0
+
+
+class NERRequest(BaseModel):
+    text: str = Field(..., min_length=1, max_length=512, description="Text to extract named entities from.")
+
+
+class NERResult(BaseModel):
+    model: str
+    entities: list[Entity]
+
+
+class CaseStyleRequest(BaseModel):
+    text: str = Field(..., min_length=1, max_length=4000, description="Text to classify by case style.")
+
+
+class CaseStyleResult(BaseModel):
+    style: str
+    letters: int
+    uppercase: int
+    lowercase: int
+    confidence: float

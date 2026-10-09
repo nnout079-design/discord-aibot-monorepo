@@ -41,8 +41,9 @@ class CrisisDetectionAdapter(BaseModelAdapter):
             tokenizer = AutoTokenizer.from_pretrained(self.model_id, trust_remote_code=True, **kwargs)
             model = AutoModelForSequenceClassification.from_pretrained(
                 self.model_id,
-                torch_dtype="auto",
+                torch_dtype=torch.float32,
                 trust_remote_code=True,
+                low_cpu_mem_usage=False,
                 **kwargs,
             )
             model.to(self.device)

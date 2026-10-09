@@ -10,8 +10,25 @@ from prometheus_client import Counter, Histogram, generate_latest
 from starlette.responses import Response
 
 from .config import get_settings
-from .models import CrisisDetectionAdapter, EmbeddingAdapter, EmotionClassificationAdapter, TriageAdapter
-from .schemas import AnalyzeRequest, AnalyzeResponse, CrisisResult, EmbedRequest, EmotionLabel, EmotionResult, EmbeddingResult, HealthResponse, TriageResult
+from .models import CaseStyleClassifier, CrisisDetectionAdapter, EmbeddingAdapter, EmotionClassificationAdapter, FillMaskAdapter, NERAdapter, TriageAdapter
+from .schemas import (
+    AnalyzeRequest,
+    AnalyzeResponse,
+    CaseStyleRequest,
+    CaseStyleResult,
+    CrisisResult,
+    EmbedRequest,
+    EmotionLabel,
+    EmotionResult,
+    EmbeddingResult,
+    Entity,
+    FillMaskRequest,
+    FillMaskResult,
+    HealthResponse,
+    NERRequest,
+    NERResult,
+    TriageResult,
+)
 from .safety import anonymize_user_id, build_crisis_safety_message, classify_severity
 
 logger = logging.getLogger("mental-health")
@@ -77,6 +94,10 @@ async def _load_adapters() -> None:
                 adapter = EmotionClassificationAdapter(model_id, **kwargs)
         elif cfg["task"] == "feature-extraction":
             adapter = EmbeddingAdapter(model_id, **kwargs)
+        elif cfg["task"] == "fill-mask":
+            adapter = FillMaskAdapter(model_id, **kwargs)
+        elif cfg["task"] == "token-classification":
+            adapter = NERAdapter(model_id, **kwargs)
         else:
             logger.warning("Unknown task '%s' for model '%s'", cfg["task"], model_name)
             continue
@@ -213,6 +234,48 @@ async def embed(request: EmbedRequest) -> EmbeddingResult:
     text = request.text[: settings.max_input_length]
     raw = await _get_adapter("embedding").predict(text)
     return EmbeddingResult(**raw)
+
+
+@app.post("/bertcase/fillmask", response_model=FillMaskResult)
+async def bertcase_fillmask(request: FillMaskRequest) -> FillMaskResult:
+    REQUEST_COUNT.labels(endpoint="/bertcase/fillmask", task="fill-mask").inc()
+    settings = get_settings()
+    text = request.text[: settings.max_input_length]
+    start = time.time()
+    raw = await _get_adapter("bert_case_fillmask").predict(text, top_k=request.top_k)
+    INFERENCE_DURATION.labels(model="bert_case_fillmask").observe(time.time() - start)
+    return FillMaskResult(**raw)
+
+
+@app.post("/bertcase/ner", response_model=NERResult)
+async def bertcase_ner(request: NERRequest) -> NERResult:
+    REQUEST_COUNT.labels(endpoint="/bertcase/ner", task="token-classification").inc()
+    settings = get_settings()
+    text = request.text[: settings.max_input_length]
+    start = time.time()
+    raw = await _get_adapter("bert_case_ner").predict(text)
+    INFERENCE_DURATION.labels(model="bert_case_ner").observe(time.time() - start)
+    return NERResult(**raw)
+
+
+@app.post("/bertcase/embed", response_model=EmbeddingResult)
+async def bertcase_embed(request: EmbedRequest) -> EmbeddingResult:
+    REQUEST_COUNT.labels(endpoint="/bertcase/embed", task="embedding").inc()
+    settings = get_settings()
+    text = request.text[: settings.max_input_length]
+    start = time.time()
+    raw = await _get_adapter("bert_case_embedding").predict(text)
+    INFERENCE_DURATION.labels(model="bert_case_embedding").observe(time.time() - start)
+    return EmbeddingResult(**raw)
+
+
+@app.post("/bertcase/style", response_model=CaseStyleResult)
+async def bertcase_style(request: CaseStyleRequest) -> CaseStyleResult:
+    REQUEST_COUNT.labels(endpoint="/bertcase/style", task="case-style").inc()
+    settings = get_settings()
+    text = request.text[: settings.max_input_length]
+    raw = await CaseStyleClassifier().predict(text)
+    return CaseStyleResult(**raw)
 
 
 @app.get("/metrics")

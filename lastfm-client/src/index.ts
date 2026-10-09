@@ -5,11 +5,12 @@ import * as lastfmCommand from './commands/lastfm';
 import * as syncCommand from './commands/sync';
 import * as companionCommand from './commands/companion';
 import * as wellnessCommand from './commands/wellness';
+import * as bertcaseCommand from './commands/bertcase';
 import { companionHub } from './sync/companion-hub';
 import { companionControl } from './sync/session';
 dotenv.config();
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
-const commands = [percussionCommand.data, lastfmCommand.data, syncCommand.data, companionCommand.data, wellnessCommand.data];
+const commands = [percussionCommand.data, lastfmCommand.data, syncCommand.data, companionCommand.data, wellnessCommand.data, bertcaseCommand.data];
 client.once('ready', async () => {
   console.log('✓ Bot ready');
   try {
@@ -19,6 +20,7 @@ client.once('ready', async () => {
     console.log('✓ Registered /sync');
     console.log('✓ Registered /companion');
     console.log('✓ Registered /wellness');
+    console.log('✓ Registered /bertcase');
   } catch (error) {
     console.error('Command registration failed:', error);
   }
@@ -40,6 +42,9 @@ client.on('interactionCreate', async interaction => {
     }
     if (interaction.commandName === wellnessCommand.data.name) {
       await wellnessCommand.execute(interaction);
+    }
+    if (interaction.commandName === bertcaseCommand.data.name) {
+      await bertcaseCommand.execute(interaction);
     }
   } catch (error) {
     console.error('Command failed:', error);

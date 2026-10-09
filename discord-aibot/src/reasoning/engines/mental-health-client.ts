@@ -28,6 +28,36 @@ export interface EmbeddingResult {
   vector?: number[];
 }
 
+export interface FillMaskPrediction {
+  token: string;
+  word: string;
+  score: number;
+}
+
+export interface FillMaskResult {
+  model: string;
+  predictions: FillMaskPrediction[];
+}
+
+export interface Entity {
+  word: string;
+  label: string;
+  score?: number;
+}
+
+export interface NERResult {
+  model: string;
+  entities: Entity[];
+}
+
+export interface CaseStyleResult {
+  style: string;
+  letters: number;
+  uppercase: number;
+  lowercase: number;
+  confidence: number;
+}
+
 export interface AnalyzeOptions {
   includeCrisis?: boolean;
   includeEmotion?: boolean;
@@ -124,6 +154,22 @@ export class MentalHealthClient {
 
   async embed(text: string): Promise<EmbeddingResult> {
     return this.post<EmbeddingResult>("/embed", { text });
+  }
+
+  async fillMask(text: string, topK = 5): Promise<FillMaskResult> {
+    return this.post<FillMaskResult>("/bertcase/fillmask", { text, top_k: topK });
+  }
+
+  async namedEntities(text: string): Promise<NERResult> {
+    return this.post<NERResult>("/bertcase/ner", { text });
+  }
+
+  async caseEmbed(text: string): Promise<EmbeddingResult> {
+    return this.post<EmbeddingResult>("/bertcase/embed", { text });
+  }
+
+  async caseStyle(text: string): Promise<CaseStyleResult> {
+    return this.post<CaseStyleResult>("/bertcase/style", { text });
   }
 
   async triage(text: string): Promise<TriageResult> {

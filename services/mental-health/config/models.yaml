@@ -23,3 +23,21 @@ mental_embedding:
   model_id: AIMH/mental-bert-large-uncased
   description: Mental-health-domain BERT-large encoder used for specialized embeddings.
   enabled: false
+
+bert_case_fillmask:
+  task: fill-mask
+  model_id: google-bert/bert-base-cased
+  description: Cased BERT base model used for masked language modeling to demonstrate case sensitivity.
+  enabled: true
+
+bert_case_ner:
+  task: token-classification
+  model_id: dslim/bert-base-NER
+  description: BERT-base-cased NER model for extracting PER, ORG, LOC, and MISC entities.
+  enabled: true
+
+bert_case_embedding:
+  task: feature-extraction
+  model_id: google-bert/bert-base-cased
+  description: Cased BERT base encoder for case-aware text embeddings.
+  enabled: true
