@@ -8,6 +8,18 @@ from transformers import AutoModelForSequenceClassification, AutoTokenizer
 from .base import BaseModelAdapter
 
 
+def _crisis_class_index(id2label: dict[int, str], num_labels: int) -> int:
+    """Resolve the crisis class, defaulting to class 1 for binary classifiers."""
+    for index, label in id2label.items():
+        if "crisis" in label.lower():
+            return index
+
+    if num_labels == 2:
+        return 1
+
+    raise ValueError("Crisis class is ambiguous for a non-binary model without a crisis label")
+
+
 class CrisisDetectionAdapter(BaseModelAdapter):
     """Binary crisis / safe classifier.
 
@@ -69,11 +81,9 @@ class CrisisDetectionAdapter(BaseModelAdapter):
             prob_list = probs[0].cpu().tolist()
             scores = {id2label.get(i, str(i)): p for i, p in enumerate(prob_list)}
 
-            # Assume label "1" / "CRISIS" is the crisis class; fallback to highest.
-            crisis_key = next((k for k in scores if "crisis" in k.lower() or "1" == str(k)), None)
-            if crisis_key is None:
-                crisis_key = max(scores, key=scores.get)
-            crisis_confidence = float(scores[crisis_key])
+            # The configured model defines class 1 as CRISIS; LABEL_0/1 are not semantic labels.
+            crisis_index = _crisis_class_index(id2label, len(prob_list))
+            crisis_confidence = float(prob_list[crisis_index])
 
             return {
                 "scores": scores,

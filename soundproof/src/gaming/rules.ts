@@ -69,6 +69,45 @@ const rules: GameRule[] = [
     cooldownSeconds: 60
   },
   {
+    id: "vehicle-siren",
+    games: ["*"],
+    events: ["vehicle-noise"],
+    keywords: ["siren", "emergency", "police", "ambulance", "fire engine"],
+    response: "Emergency vehicle audio detected. Expect pursuit or response gameplay.",
+    cooldownSeconds: 60
+  },
+  {
+    id: "vehicle-aircraft",
+    games: ["*"],
+    events: ["vehicle-noise"],
+    keywords: ["aircraft", "airplane", "helicopter", "jet", "propeller"],
+    response: "Aircraft noise detected. Watch the sky for flyovers or drops.",
+    cooldownSeconds: 60
+  },
+  {
+    id: "vehicle-horn",
+    games: ["*"],
+    events: ["vehicle-noise"],
+    keywords: ["horn", "toot", "car alarm"],
+    response: "Vehicle horn/alarm detected on stream.",
+    cooldownSeconds: 45
+  },
+  {
+    id: "vehicle-engine",
+    games: ["*"],
+    events: ["vehicle-noise"],
+    keywords: ["engine", "revving", "vroom", "accelerating", "idling", "race car", "auto racing"],
+    response: "Engine noise detected. Sounds like driving or racing action.",
+    cooldownSeconds: 60
+  },
+  {
+    id: "vehicle-generic",
+    games: ["*"],
+    events: ["vehicle-noise"],
+    response: "Vehicle noise detected in the audio feed.",
+    cooldownSeconds: 90
+  },
+  {
     id: "generic-defeat",
     games: ["*"],
     phases: ["defeat"],

@@ -1,3 +1,4 @@
+import { LightPlan } from "../lights/palette";
 import { ScheduledHit } from "../midi/schedule";
 
 export const COUNT_IN_NOTE = 37;
@@ -18,6 +19,21 @@ export interface TrackAttributes {
   url?: string;
   durationMs?: number;
   tags: string[];
+  mbid?: string;
+  imageUrl?: string;
+  summary?: string;
+  listeners?: number;
+  playcount?: number;
+  artistTags?: string[];
+  similarArtists?: string[];
+  bpm?: number;
+  timeSig?: number;
+  key?: string;
+  openKey?: string;
+  danceability?: number;
+  acousticness?: number;
+  genres?: string[];
+  year?: number;
 }
 
 export interface SongEntryEvent {
@@ -32,6 +48,8 @@ export interface SongEntryEvent {
   pattern: string | null;
   track: TrackAttributes | null;
   midi?: { channel: number; hits: ScheduledHit[] };
+  /** Colours and energy for the galaxy light rigs. */
+  lights?: LightPlan;
 }
 
 export interface SongStopEvent {
@@ -66,9 +84,10 @@ export function songEntryEvent(
   pattern: string | null,
   track: TrackAttributes | null,
   sentAt = Date.now(),
-  midi?: SongEntryEvent["midi"]
+  midi?: SongEntryEvent["midi"],
+  lights?: LightPlan
 ): SongEntryEvent {
-  return { type: "song-entry", sentAt, ...plan, pattern, track, ...(midi && { midi }) };
+  return { type: "song-entry", sentAt, ...plan, pattern, track, ...(midi && { midi }), ...(lights && { lights }) };
 }
 
 export async function notifyTargets(event: SongEntryEvent | SongStopEvent, targets = process.env.SYNC_TARGETS ?? ""): Promise<void> {

@@ -17,7 +17,8 @@ COPY src ./src
 
 # Run as non-root user.
 RUN groupadd -r mhuser && useradd -r -g mhuser mhuser
-RUN chown -R mhuser:mhuser /app
+RUN mkdir -p /app/.cache/huggingface \
+    && chown -R mhuser:mhuser /app
 USER mhuser
 
 ENV PYTHONDONTWRITEBYTECODE=1 \

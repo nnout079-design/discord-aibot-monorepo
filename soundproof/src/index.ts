@@ -5,11 +5,13 @@ import * as streamCommand from './commands/streaming/stream';
 import * as gameCommand from './commands/gaming/game';
 import * as wellnessCommand from './commands/wellness';
 import { attachGameReactionClient, startCompanionServer } from './streaming/companion-server';
+import { attachVehicleCallbackClient } from './streaming/vehicle-callback';
 dotenv.config();
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates] });
 
 const commands = [askCommand.data, streamCommand.data, gameCommand.data, wellnessCommand.data];
 attachGameReactionClient(client);
+attachVehicleCallbackClient(client);
 startCompanionServer();
 
 client.once('ready', async () => {

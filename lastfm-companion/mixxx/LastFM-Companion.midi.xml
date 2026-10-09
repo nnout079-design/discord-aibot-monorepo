@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Mixxx mapping for the lastfm-companion DJ booth. In loopMIDI create a port named "Rig DJ",
+     then in Mixxx: Preferences > Controllers > Rig DJ > Load Mapping > LastFM Companion.
+     The companion sends note 1 (play) on the downbeat and note 2 (stop) on /sync stop, both on channel 1. -->
+<MixxxControllerPreset mixxxVersion="2.3.0+" schemaVersion="1">
+  <info>
+    <name>LastFM Companion</name>
+    <author>lastfm-companion</author>
+    <description>Starts deck 1 on the /sync downbeat and stops it on /sync stop.</description>
+  </info>
+  <controller id="Rig DJ">
+    <scriptfiles/>
+    <controls>
+      <control>
+        <group>[Channel1]</group>
+        <key>play</key>
+        <status>0x90</status>
+        <midino>0x01</midino>
+        <options><normal/></options>
+      </control>
+      <control>
+        <group>[Channel1]</group>
+        <key>start_stop</key>
+        <status>0x90</status>
+        <midino>0x02</midino>
+        <options><normal/></options>
+      </control>
+    </controls>
+    <outputs/>
+  </controller>
+</MixxxControllerPreset>

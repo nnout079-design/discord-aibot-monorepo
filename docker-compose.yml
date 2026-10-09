@@ -101,6 +101,11 @@
       - DATABASE_URL=postgresql://${POSTGRES_USER:-discord}:${POSTGRES_PASSWORD:-discord_password}@postgres:5432/${POSTGRES_DB:-discord_bots}
       - REDIS_URL=redis://:${REDIS_PASSWORD:-redis_secure_password}@redis:6379
       - MONGO_URL=mongodb://${MONGO_USER:-discord}:${MONGO_PASSWORD:-discord_password}@mongo:27017/discord_bots?authSource=admin
+      - AUDIO_EVENTS_URL=http://audio-events:8100
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - STREAM_INGEST_TOKEN=${STREAM_INGEST_TOKEN}
+      - VEHICLE_NOISE_WEBHOOK_URL=${VEHICLE_NOISE_WEBHOOK_URL:-}
+      - VEHICLE_NOISE_THRESHOLD=${VEHICLE_NOISE_THRESHOLD:-0.4}
     depends_on:
       postgres:
         condition: service_healthy
@@ -243,8 +248,11 @@
     image: discord-bot-lastfm-client:latest
     container_name: lastfm-bot
     build: ./lastfm-client
+    env_file:
+      - ./lastfm-companion/.env
     ports:
       - "127.0.0.1:3005:3000"
+      - "127.0.0.1:8080:8080"
     environment:
       - DISCORD_TOKEN=${DISCORD_TOKEN}
       - DATABASE_URL=postgresql://${POSTGRES_USER:-discord}:${POSTGRES_PASSWORD:-discord_password}@postgres:5432/${POSTGRES_DB:-discord_bots}
@@ -306,6 +314,36 @@
         reservations:
           cpus: '1.0'
           memory: 2G
+    networks:
+      - discord-network
+
+  # Audio Events Inference Service (vehicle-noise tagging for soundproof)
+  audio-events:
+    image: discord-audio-events-service:latest
+    container_name: audio-events-service
+    build: ./services/audio-events
+    ports:
+      - "127.0.0.1:8100:8100"
+    environment:
+      - HF_HOME=/app/.cache/huggingface
+      - MODEL_ID=MIT/ast-finetuned-audioset-10-10-0.4593
+      - VEHICLE_LABELS_PATH=/app/config/vehicle-labels.json
+      - VEHICLE_THRESHOLD=0.4
+      - MAX_CLIP_SECONDS=30
+      - DEVICE=cpu
+    volumes:
+      - audio_events_cache:/app/.cache/huggingface
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
     networks:
       - discord-network
 
@@ -371,6 +409,7 @@ volumes:
   redis_data:
   mongo_data:
   mental_health_cache:
+  audio_events_cache:
   prometheus_data:
   grafana_data:
 

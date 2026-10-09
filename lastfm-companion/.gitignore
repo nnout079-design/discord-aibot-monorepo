@@ -2,3 +2,7 @@ node_modules/
 dist/
 .env
 *.log
+/songs/
+/studio/
+/rig.json
+/lights.json

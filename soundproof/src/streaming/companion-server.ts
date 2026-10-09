@@ -5,6 +5,8 @@ import { detectGameFromText } from "../gaming/epic";
 import { normalizeTelemetry, updateGameState } from "../gaming/game-state";
 import { evaluateGameRules } from "../gaming/rules";
 import { fetchStarCitizenTelemetry } from "../gaming/star-citizen";
+import { detectVehicleNoise } from "./audio-events-client";
+import { handleVehicleDetection } from "./vehicle-callback";
 
 export interface VideoFrame {
   guildId: string;
@@ -12,6 +14,13 @@ export interface VideoFrame {
   capturedAt: string;
   imageBase64: string;
   analysis?: string;
+}
+
+export interface AudioClip {
+  guildId: string;
+  channelId: string;
+  audioBase64: string;
+  game?: string;
 }
 
 let latestFrame: VideoFrame | undefined;
@@ -104,6 +113,45 @@ export function startCompanionServer(): void {
       if (channel?.isTextBased()) await (channel as TextChannel).send(reaction.content);
     }
     response.status(202).json({ accepted: true, capturedAt: latestFrame.capturedAt, rule: reaction?.ruleId ?? null });
+  });
+
+  app.post("/stream/audio", async (request: Request, response: Response) => {
+    const expectedToken = process.env.STREAM_INGEST_TOKEN;
+    if (!expectedToken || request.header("x-stream-token") !== expectedToken) {
+      response.status(401).json({ error: "unauthorized" });
+      return;
+    }
+
+    const { guildId, channelId, audioBase64, game } = request.body as Partial<AudioClip>;
+    if (!guildId || !channelId || !audioBase64) {
+      response.status(400).json({ error: "guildId, channelId, and audioBase64 are required" });
+      return;
+    }
+
+    try {
+      const result = await detectVehicleNoise(Buffer.from(audioBase64, "base64"));
+      if (!result) {
+        response.status(503).json({ error: "audio-events service is not configured" });
+        return;
+      }
+      const ruleId = await handleVehicleDetection({
+        guildId,
+        channelId,
+        game,
+        source: "capture",
+        result
+      });
+      response.status(202).json({
+        accepted: true,
+        isVehicle: result.isVehicle,
+        topLabel: result.topLabel,
+        detections: result.detections,
+        rule: ruleId
+      });
+    } catch (error) {
+      console.error("Vehicle noise detection failed:", error);
+      response.status(502).json({ error: "audio-events service unavailable" });
+    }
   });
 
   const port = Number(process.env.PORT ?? 3000);

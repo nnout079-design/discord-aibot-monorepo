@@ -1,5 +1,53 @@
 # Agent Notes: Mental Health Feature
 
+# Agent Notes: Vehicle-Noise Audio Events Feature
+
+## What changed
+
+- Added a dedicated Python inference service at `services/audio-events/`.
+  - Runs a FastAPI app with `/health`, `/classify`, `/vehicle`, and `/metrics` endpoints.
+  - Default model: `MIT/ast-finetuned-audioset-10-10-0.4593` (Audio Spectrogram Transformer, 527 AudioSet labels, multi-label).
+  - Vehicle labels are configured as case-insensitive substrings in `config/vehicle-labels.json`.
+  - Accepts `audio_base64` (WAV/FLAC/OGG), decodes via `soundfile`, resamples to 16 kHz, returns `is_vehicle` + `top_label` + detections.
+  - Exposes Prometheus metrics for requests, vehicle detections, and inference latency.
+
+- Vehicle-noise callbacks in `soundproof`:
+  - `src/streaming/audio-events-client.ts` — HTTP client for `/vehicle` (disabled when `AUDIO_EVENTS_URL` is unset).
+  - `src/streaming/vehicle-callback.ts` — routes detections through the existing `updateGameState → evaluateGameRules` pipeline to post a Discord channel message, and POSTs a JSON event to `VEHICLE_NOISE_WEBHOOK_URL` when configured.
+  - `POST /stream/audio` on the companion server — capture clients upload base64 audio clips (same `x-stream-token` auth as `/stream/frame`).
+  - `voice-transcriber.ts` — runs vehicle-noise detection alongside Whisper transcription on voice-channel audio.
+  - New rules in `src/gaming/rules.ts`: `vehicle-siren`, `vehicle-aircraft`, `vehicle-horn`, `vehicle-engine`, `vehicle-generic` match `vehicle-noise` events.
+
+## Environment variables
+
+```env
+# soundproof
+AUDIO_EVENTS_URL=http://localhost:8100          # http://audio-events:8100 in compose
+VEHICLE_NOISE_WEBHOOK_URL=                      # optional outbound callback
+VEHICLE_NOISE_THRESHOLD=0.4
+
+# services/audio-events
+MODEL_ID=MIT/ast-finetuned-audioset-10-10-0.4593
+VEHICLE_THRESHOLD=0.4
+MAX_CLIP_SECONDS=30
+VEHICLE_LABELS_PATH=config/vehicle-labels.json
+```
+
+In production, `soundproof/fly.toml` points `AUDIO_EVENTS_URL` at
+`https://discord-audio-events-service.fly.dev`; the service deploys as the
+`discord-audio-events-service` Fly app (`services/audio-events/fly.toml`).
+
+## Pushing a game audio clip
+
+```bash
+curl -X POST http://localhost:3000/stream/audio \
+  -H "content-type: application/json" \
+  -H "x-stream-token: $STREAM_INGEST_TOKEN" \
+  -d '{"guildId":"...","channelId":"...","game":"star citizen","audioBase64":"'"$(base64 -w0 clip.wav)"'"}'
+```
+
+# Agent Notes: Mental Health Feature
+
 ## What changed
 
 - Added a dedicated Python inference service at `services/mental-health/`.

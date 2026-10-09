@@ -7,6 +7,7 @@ set -euo pipefail
 
 APPS=(
   "services/mental-health"
+  "services/audio-events"
   "discord-aibot"
   "soundproof"
   "lkeff-listen"

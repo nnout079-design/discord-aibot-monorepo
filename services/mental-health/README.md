@@ -85,6 +85,8 @@ python -m training.export_onnx \
 ## Safety
 
 - This service is **not a clinical tool**. Predictions are supportive triage signals, not diagnoses.
+- The configured crisis model's model card defines class index `1` as the crisis class. When model labels are generic (`LABEL_0`/`LABEL_1`), the adapter uses that documented binary-class convention; an arbitrary highest-scoring class must not be treated as crisis.
+- The crisis model card reports training on synthetic data. Validate its behavior on representative, consented data and keep human review in the loop before relying on its predictions.
 - Always provide human escalation paths and crisis resources.
 - Review `config/resources.json` to match the regions/communities you serve.
 - Do not train on user messages without informed consent and a privacy review.

@@ -1,0 +1,37 @@
+app = 'discord-audio-events-service'
+primary_region = 'iad'
+
+[build]
+  dockerfile = 'Dockerfile'
+
+[http_service]
+  internal_port = 8100
+  force_https = true
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ['app']
+
+[[http_service.checks]]
+  interval = '30s'
+  timeout = '10s'
+  grace_period = '30s'
+  method = 'GET'
+  path = '/health'
+  protocol = 'http'
+  tls_skip_verify = false
+
+[[vm]]
+  cpu_kind = 'shared'
+  cpus = 1
+  memory_mb = 2048
+
+[env]
+  HOST = '0.0.0.0'
+  PORT = '8100'
+  LOG_LEVEL = 'info'
+  DEVICE = 'cpu'
+  MODEL_ID = 'MIT/ast-finetuned-audioset-10-10-0.4593'
+  VEHICLE_THRESHOLD = '0.4'
+  MAX_CLIP_SECONDS = '30'
+  VEHICLE_LABELS_PATH = '/app/config/vehicle-labels.json'

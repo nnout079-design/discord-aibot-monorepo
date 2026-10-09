@@ -2,6 +2,8 @@ import { EndBehaviorType, VoiceConnection, VoiceReceiver, joinVoiceChannel, getV
 import { VoiceBasedChannel, TextChannel } from "discord.js";
 import prism from "prism-media";
 import { transcribeAudio } from "./whisper";
+import { detectVehicleNoise } from "./audio-events-client";
+import { handleVehicleDetection } from "./vehicle-callback";
 
 const activeConnections = new Map<string, VoiceConnection>();
 const activeUsers = new Set<string>();
@@ -38,11 +40,26 @@ function subscribeToSpeaker(receiver: VoiceReceiver, userId: string, textChannel
   decoder.on("end", async () => {
     activeUsers.delete(userId);
     if (chunks.length === 0) return;
-    try {
-      const transcript = await transcribeAudio(pcmToWav(Buffer.concat(chunks)));
-      if (transcript.trim()) await textChannel.send(`Whisper transcript <@${userId}>: ${transcript}`);
-    } catch (error) {
-      console.error("Whisper transcription failed:", error);
+    const wav = pcmToWav(Buffer.concat(chunks));
+    const [transcriptResult, vehicleResult] = await Promise.allSettled([
+      transcribeAudio(wav),
+      detectVehicleNoise(wav)
+    ]);
+    if (transcriptResult.status === "fulfilled" && transcriptResult.value.trim()) {
+      await textChannel.send(`Whisper transcript <@${userId}>: ${transcriptResult.value}`);
+    } else if (transcriptResult.status === "rejected") {
+      console.error("Whisper transcription failed:", transcriptResult.reason);
+    }
+    if (vehicleResult.status === "fulfilled" && vehicleResult.value?.isVehicle) {
+      await handleVehicleDetection({
+        guildId: textChannel.guild.id,
+        channelId: textChannel.id,
+        source: "voice",
+        userId,
+        result: vehicleResult.value
+      });
+    } else if (vehicleResult.status === "rejected") {
+      console.error("Vehicle noise detection failed:", vehicleResult.reason);
     }
   });
 }
