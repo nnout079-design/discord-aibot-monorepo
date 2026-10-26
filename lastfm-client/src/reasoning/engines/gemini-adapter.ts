@@ -456,6 +456,11 @@ function parseModelList(value: string | undefined): string[] | undefined {
   return value === undefined ? undefined : value.split(",").map(model => model.trim()).filter(Boolean);
 }
 
+function parsePositiveInteger(value: string | undefined, fallback: number): number {
+  const parsed = Number(value);
+  return value !== undefined && value.trim() !== "" && Number.isSafeInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
 const RETRYABLE_GEMINI_STATUSES = new Set([404, 429, 500, 502, 503, 504]);
 
 class GeminiHttpError extends Error {
@@ -468,6 +473,12 @@ class GeminiNetworkError extends Error {
   constructor(error: unknown) {
     super(error instanceof Error ? error.message : String(error));
   }
+}
+
+function isAbortError(error: unknown): boolean {
+  if (typeof error !== "object" || error === null || !("name" in error)) return false;
+  const name = (error as { name?: unknown }).name;
+  return name === "AbortError" || name === "TimeoutError";
 }
 
 export class GeminiStudioAgent {
@@ -484,11 +495,15 @@ export class GeminiStudioAgent {
     this.model = options.model ?? process.env.GEMINI_MODEL ?? "gemini-3.8-flash";
     this.fallbackModels = options.fallbackModels ?? parseModelList(process.env.GEMINI_FALLBACK_MODELS) ?? ["gemini-3.6-flash"];
     this.fetchImpl = options.fetchImpl ?? fetch;
-    this.timeoutMs = options.timeoutMs ?? 25000;
+    this.timeoutMs = options.timeoutMs ?? parsePositiveInteger(process.env.GEMINI_TIMEOUT_MS, 45000);
   }
 
   get configured(): boolean {
     return Boolean(this.apiKey);
+  }
+
+  private get modelChain(): string[] {
+    return [...new Set([this.model, ...this.fallbackModels])];
   }
 
   // Only successful Gemini diagnoses use quota; heuristic answers are free.
@@ -512,13 +527,14 @@ export class GeminiStudioAgent {
       diagnosis = { ...fallback, ...normalizeDiagnosis(result, fallback), model, source: "gemini" };
     } catch (error) {
       await reservation.release();
-      console.warn(`Gemini (${this.model}) diagnosis failed, using heuristic diagnosis:`, error instanceof Error ? error.message : error);
+      const reason = error instanceof Error ? error.message : String(error);
+      console.warn(`Gemini diagnosis failed (tried ${this.modelChain.join(", ")}), using heuristic diagnosis: ${reason}`);
     }
     return { diagnosis, quota: await this.quotaManager.checkQuota(userId, options.bypassQuota) };
   }
 
   private async callGemini(track: TrackAttributes, videoDescriptions?: string[]): Promise<{ result: unknown; model: string }> {
-    const models = [...new Set([this.model, ...this.fallbackModels])];
+    const models = this.modelChain;
     for (let index = 0; index < models.length; index++) {
       const model = models[index];
       try {
@@ -552,10 +568,21 @@ export class GeminiStudioAgent {
       throw new GeminiNetworkError(error);
     }
     if (!response.ok) {
-      const detail = await response.text().catch(() => "");
+      let detail = "";
+      try {
+        detail = await response.text();
+      } catch (error) {
+        if (isAbortError(error)) throw new GeminiNetworkError(error);
+      }
       throw new GeminiHttpError(response.status, `Gemini API returned HTTP ${response.status}${detail ? `: ${detail.slice(0, 200)}` : ""}`);
     }
-    const data = await response.json() as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
+    let data: { candidates?: { content?: { parts?: { text?: string }[] } }[] };
+    try {
+      data = await response.json() as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
+    } catch (error) {
+      if (isAbortError(error)) throw new GeminiNetworkError(error);
+      throw error;
+    }
     const text = data.candidates?.[0]?.content?.parts?.map(p => p.text ?? "").join("").trim();
     if (!text) throw new Error("Empty response from Gemini");
     return JSON.parse(text.replace(/^```(?:json)?\s*|\s*```$/g, ""));

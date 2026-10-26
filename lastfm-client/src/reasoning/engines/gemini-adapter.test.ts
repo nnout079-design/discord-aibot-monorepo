@@ -188,6 +188,82 @@ test("fallback model configuration parses and restores the environment", () => {
   }
 });
 
+test("Gemini request timeout parses the environment and honors the option override", () => {
+  const previous = process.env.GEMINI_TIMEOUT_MS;
+  const timeoutOf = (agent: GeminiStudioAgent) => (agent as unknown as { timeoutMs: number }).timeoutMs;
+  try {
+    delete process.env.GEMINI_TIMEOUT_MS;
+    assert.equal(timeoutOf(new GeminiStudioAgent("")), 45_000);
+    process.env.GEMINI_TIMEOUT_MS = "32000";
+    assert.equal(timeoutOf(new GeminiStudioAgent("")), 32_000);
+    assert.equal(timeoutOf(new GeminiStudioAgent("", undefined, { timeoutMs: 12_000 })), 12_000);
+    process.env.GEMINI_TIMEOUT_MS = "invalid";
+    assert.equal(timeoutOf(new GeminiStudioAgent("")), 45_000);
+    delete process.env.GEMINI_TIMEOUT_MS;
+    assert.equal(timeoutOf(new GeminiStudioAgent("")), 45_000);
+  } finally {
+    if (previous === undefined) delete process.env.GEMINI_TIMEOUT_MS;
+    else process.env.GEMINI_TIMEOUT_MS = previous;
+  }
+});
+
+test("Gemini failure log lists the deduplicated model chain", async () => {
+  const fetchImpl = (async () => new Response("unavailable", { status: 503 })) as unknown as typeof fetch;
+  const agent = new GeminiStudioAgent("key", new UserQuotaManager(1), {
+    model: "primary-x",
+    fallbackModels: ["fallback-y", "primary-x"],
+    fetchImpl
+  });
+  const warnings: string[] = [];
+  const warn = console.warn;
+  console.warn = (...args: unknown[]) => warnings.push(args.map(String).join(" "));
+  try {
+    const { diagnosis } = await agent.diagnose(track, [], "failure-log-user");
+    assert.equal(diagnosis.source, "heuristic");
+    assert.ok(warnings.some(message =>
+      message.includes("Gemini diagnosis failed (tried primary-x, fallback-y), using heuristic diagnosis: Gemini API returned HTTP 503")
+    ));
+  } finally {
+    console.warn = warn;
+  }
+});
+
+test("body-read timeouts retry the next Gemini model", async () => {
+  const timeoutResponse = (status: number, method: "text" | "json"): Response => {
+    const response = new Response(null, { status });
+    Object.defineProperty(response, method, {
+      value: async () => { throw new DOMException("timeout", "TimeoutError"); }
+    });
+    return response;
+  };
+  const successResponse = () => new Response(JSON.stringify({
+    candidates: [{ content: { parts: [{ text: JSON.stringify({}) }] } }]
+  }), { status: 200 });
+
+  for (const [status, method] of [[200, "json"], [503, "text"]] as const) {
+    let requests = 0;
+    const fetchImpl = (async () => {
+      requests++;
+      return requests === 1 ? timeoutResponse(status, method) : successResponse();
+    }) as unknown as typeof fetch;
+    const agent = new GeminiStudioAgent("key", new UserQuotaManager(1), {
+      model: "primary-x",
+      fallbackModels: ["fallback-y"],
+      fetchImpl
+    });
+    const warn = console.warn;
+    console.warn = () => {};
+    try {
+      const { diagnosis } = await agent.diagnose(track, [], `body-timeout-${method}`);
+      assert.equal(requests, 2);
+      assert.equal(diagnosis.source, "gemini");
+      assert.equal(diagnosis.model, "fallback-y");
+    } finally {
+      console.warn = warn;
+    }
+  }
+});
+
 test("Gemini output is requested with a schema and normalized", async () => {
   let request: { url: string; init: RequestInit } | null = null;
   const reply = {

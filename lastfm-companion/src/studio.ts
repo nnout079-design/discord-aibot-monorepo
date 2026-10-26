@@ -241,7 +241,7 @@ export async function diagnose(
         ...(args.username && !args.artist ? { username: args.username } : { artist: args.artist, title: args.title }),
         userId: args.username, videos: descriptions, originalSound: args.originalSound
       }),
-      signal: AbortSignal.timeout(45000)
+      signal: AbortSignal.timeout(100000)
     });
   } catch (error) {
     return fallback(error instanceof Error ? error.message : String(error));
