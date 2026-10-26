@@ -123,7 +123,10 @@ export class PgQuotaStore implements QuotaStore {
     this.schemaReady ??= (async () => {
       await this.pool.query("CREATE TABLE IF NOT EXISTS studio_quota_usage (id bigserial PRIMARY KEY, user_id text NOT NULL, used_at timestamptz NOT NULL)");
       await this.pool.query("CREATE INDEX IF NOT EXISTS studio_quota_usage_user_time ON studio_quota_usage (user_id, used_at)");
-    })();
+    })().catch(error => {
+      this.schemaReady = undefined;
+      throw error;
+    });
     return this.schemaReady;
   }
 
@@ -177,7 +180,10 @@ export class PgQuotaStore implements QuotaStore {
 }
 
 export function createQuotaStore(env = process.env): QuotaStore {
-  return env.DATABASE_URL ? new PgQuotaStore(new Pool({ connectionString: env.DATABASE_URL })) : new MemoryQuotaStore();
+  if (!env.DATABASE_URL) return new MemoryQuotaStore();
+  const pool = new Pool({ connectionString: env.DATABASE_URL });
+  pool.on("error", error => console.warn(`Studio quota Postgres pool error: ${error.message}`));
+  return new PgQuotaStore(pool);
 }
 
 export class UserQuotaManager {

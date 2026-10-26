@@ -116,6 +116,21 @@ test("quota manager falls back to its memory store when the configured store fai
   }
 });
 
+test("Postgres quota store retries schema setup after a failure", async () => {
+  let calls = 0;
+  const pool = {
+    query: async () => {
+      calls++;
+      if (calls === 1) throw new Error("database starting");
+      return { rows: [] };
+    }
+  } as unknown as Pool;
+  const store = new PgQuotaStore(pool);
+  await assert.rejects(store.history("retry-user", 0), /database starting/);
+  assert.deepEqual(await store.history("retry-user", 0), []);
+  assert.equal(calls, 4);
+});
+
 const testDatabaseUrl = process.env.TEST_DATABASE_URL;
 test("Postgres quota store reserves atomically, releases usage, and returns ordered history", { skip: !testDatabaseUrl }, async () => {
   const pool = new Pool({ connectionString: testDatabaseUrl });
