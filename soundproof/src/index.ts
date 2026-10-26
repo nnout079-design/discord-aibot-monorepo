@@ -4,6 +4,7 @@ import * as askCommand from './commands/reasoning/ask';
 import * as bertcaseCommand from './commands/bertcase';
 import * as streamCommand from './commands/streaming/stream';
 import * as gameCommand from './commands/gaming/game';
+import * as handballCommand from './commands/gaming/handball';
 import * as progressCommand from './commands/progress';
 import * as wellnessCommand from './commands/wellness';
 import { recordActivity } from './progress/tracker';
@@ -12,7 +13,7 @@ import { attachVehicleCallbackClient } from './streaming/vehicle-callback';
 dotenv.config();
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates] });
 
-const commands = [askCommand.data, bertcaseCommand.data, streamCommand.data, gameCommand.data, progressCommand.data, wellnessCommand.data];
+const commands = [askCommand.data, bertcaseCommand.data, streamCommand.data, gameCommand.data, handballCommand.data, progressCommand.data, wellnessCommand.data];
 attachGameReactionClient(client);
 attachVehicleCallbackClient(client);
 startCompanionServer();
@@ -25,6 +26,7 @@ client.once('ready', async () => {
 	console.log('✓ Registered /reason');
 	console.log('✓ Registered /bertcase');
 	console.log('✓ Registered /stream and /game');
+	console.log('✓ Registered /handball');
 });
 
 client.on('interactionCreate', async interaction => {
@@ -36,6 +38,7 @@ client.on('interactionCreate', async interaction => {
 	if (interaction.commandName === bertcaseCommand.data.name) await bertcaseCommand.execute(interaction);
 	if (interaction.commandName === streamCommand.data.name) await streamCommand.execute(interaction);
 	if (interaction.commandName === gameCommand.data.name) await gameCommand.execute(interaction);
+	if (interaction.commandName === handballCommand.data.name) await handballCommand.execute(interaction);
 	if (interaction.commandName === progressCommand.data.name) await progressCommand.execute(interaction);
 	if (interaction.commandName === wellnessCommand.data.name) await wellnessCommand.execute(interaction);
 	const subcommand = interaction.options.getSubcommand(false) ?? '';
@@ -48,4 +51,3 @@ if (!discordToken) {
 }
 
 client.login(discordToken);
-

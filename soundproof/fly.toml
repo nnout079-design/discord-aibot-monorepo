@@ -10,6 +10,7 @@ primary_region = 'iad'
   PORT = '3000'
   MENTAL_HEALTH_URL = 'https://discord-mental-health-service.fly.dev'
   AUDIO_EVENTS_URL = 'https://discord-audio-events-service.fly.dev'
+  HANDBALL_DATA_PATH = '/data/handball-ranked.json'
 
 [http_service]
   internal_port = 3000

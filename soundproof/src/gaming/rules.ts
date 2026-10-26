@@ -70,6 +70,28 @@ const rules: GameRule[] = [
     cooldownSeconds: 60
   },
   {
+    id: "handball-world-grenade",
+    games: ["handball world"],
+    events: ["grenade", "throw"],
+    response: "Grenade throw detected. Watch the fuse — cook it too long and it goes off in hand.",
+    cooldownSeconds: 20
+  },
+  {
+    id: "handball-world-ranked-start",
+    games: ["handball world"],
+    phases: ["match"],
+    keywords: ["ranked"],
+    response: "Ranked Handball World match live. Read the keeper and save your long cooks for the last throws.",
+    cooldownSeconds: 60
+  },
+  {
+    id: "handball-world-victory",
+    games: ["handball world"],
+    phases: ["victory"],
+    response: "Handball World victory. Ranked points incoming.",
+    cooldownSeconds: 30
+  },
+  {
     id: "vehicle-siren",
     games: ["*"],
     events: ["vehicle-noise"],
