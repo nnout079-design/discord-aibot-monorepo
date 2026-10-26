@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+import { Redis } from "ioredis";
 import { Pool } from "pg";
 import { TrackAttributes } from "../../sync/entry";
 
@@ -179,7 +181,65 @@ export class PgQuotaStore implements QuotaStore {
   }
 }
 
+const REDIS_RESERVE_SCRIPT = `
+redis.call('ZREMRANGEBYSCORE', KEYS[1], '-inf', ARGV[1])
+if redis.call('ZCARD', KEYS[1]) < tonumber(ARGV[2]) then
+  redis.call('ZADD', KEYS[1], ARGV[3], ARGV[4])
+  redis.call('PEXPIRE', KEYS[1], ARGV[5])
+  return 1
+end
+return 0`;
+
+const REDIS_RELEASE_SCRIPT = `
+local m = redis.call('ZRANGEBYSCORE', KEYS[1], ARGV[1], ARGV[1], 'LIMIT', 0, 1)
+if m[1] then redis.call('ZREM', KEYS[1], m[1]) end`;
+
+export class RedisQuotaStore implements QuotaStore {
+  constructor(private client: Redis, private prefix = "studio:quota:") {}
+
+  private key(userId: string): string {
+    return `${this.prefix}${userId}`;
+  }
+
+  async history(userId: string, since: number): Promise<number[]> {
+    const entries = await this.client.zrangebyscore(this.key(userId), `(${since}`, "+inf", "WITHSCORES");
+    return entries.filter((_, index) => index % 2 === 1).map(Number);
+  }
+
+  async reserve(userId: string, at: number, since: number, limit: number): Promise<boolean> {
+    const result = await this.client.eval(
+      REDIS_RESERVE_SCRIPT,
+      1,
+      this.key(userId),
+      since.toString(),
+      limit.toString(),
+      at.toString(),
+      `${at}:${randomUUID()}`,
+      (at - since).toString()
+    );
+    return Number(result) === 1;
+  }
+
+  async release(userId: string, at: number): Promise<void> {
+    await this.client.eval(REDIS_RELEASE_SCRIPT, 1, this.key(userId), at.toString());
+  }
+
+  disconnect(): void {
+    this.client.disconnect();
+  }
+}
+
 export function createQuotaStore(env = process.env): QuotaStore {
+  if (env.REDIS_URL) {
+    const url = env.REDIS_URL;
+    const client = new Redis(url, {
+      lazyConnect: true,
+      maxRetriesPerRequest: 2,
+      ...(url.startsWith("rediss://") ? { tls: {} } : {})
+    });
+    client.on("error", error => console.warn(`Studio quota Redis error: ${error.message}`));
+    return new RedisQuotaStore(client);
+  }
   if (!env.DATABASE_URL) return new MemoryQuotaStore();
   const pool = new Pool({ connectionString: env.DATABASE_URL });
   pool.on("error", error => console.warn(`Studio quota Postgres pool error: ${error.message}`));

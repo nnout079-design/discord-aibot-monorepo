@@ -1,8 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
+import { Redis } from "ioredis";
 import { Pool } from "pg";
 import { TrackAttributes } from "../../sync/entry";
-import { DIAGNOSIS_SCHEMA, formatQuota, GeminiStudioAgent, normalizeDiagnosis, PgQuotaStore, QuotaExceededError, QuotaStore, UserQuotaManager } from "./gemini-adapter";
+import { createQuotaStore, DIAGNOSIS_SCHEMA, formatQuota, GeminiStudioAgent, MemoryQuotaStore, normalizeDiagnosis, PgQuotaStore, QuotaExceededError, QuotaStore, RedisQuotaStore, UserQuotaManager } from "./gemini-adapter";
 
 const track: TrackAttributes = { name: "Song", artist: "Band", tags: ["hyperpop", "glitch"], bpm: 160, danceability: 0.8 };
 
@@ -131,6 +133,21 @@ test("Postgres quota store retries schema setup after a failure", async () => {
   assert.equal(calls, 4);
 });
 
+test("createQuotaStore prefers Redis, then Postgres, then memory", async () => {
+  const redisStore = createQuotaStore({
+    REDIS_URL: "redis://127.0.0.1:56379",
+    DATABASE_URL: "postgres://postgres:pw@127.0.0.1:55432/postgres"
+  });
+  assert.ok(redisStore instanceof RedisQuotaStore);
+  redisStore.disconnect();
+
+  const pgStore = createQuotaStore({ DATABASE_URL: "postgres://postgres:pw@127.0.0.1:55432/postgres" });
+  assert.ok(pgStore instanceof PgQuotaStore);
+  await (pgStore as unknown as { pool: Pool }).pool.end();
+
+  assert.ok(createQuotaStore({}) instanceof MemoryQuotaStore);
+});
+
 const testDatabaseUrl = process.env.TEST_DATABASE_URL;
 test("Postgres quota store reserves atomically, releases usage, and returns ordered history", { skip: !testDatabaseUrl }, async () => {
   const pool = new Pool({ connectionString: testDatabaseUrl });
@@ -157,6 +174,40 @@ test("Postgres quota store reserves atomically, releases usage, and returns orde
     assert.equal(concurrent.filter(Boolean).length, 3);
   } finally {
     await pool.end();
+  }
+});
+
+const testRedisUrl = process.env.TEST_REDIS_URL;
+test("Redis quota store reserves atomically, releases usage, and returns ordered history", { skip: !testRedisUrl }, async () => {
+  if (!testRedisUrl) return;
+  const prefix = `studio:quota:test:${randomUUID()}:`;
+  const keys = [`${prefix}redis-user`, `${prefix}redis-concurrent`];
+  const client = new Redis(testRedisUrl, { lazyConnect: true, maxRetriesPerRequest: 2 });
+  const store = new RedisQuotaStore(client, prefix);
+  try {
+    await client.connect();
+    await client.del(...keys);
+    let now = 1_700_000_000_000;
+    const quota = new UserQuotaManager(2, 60_000, () => now, store);
+    const first = await quota.reserve("redis-user");
+    now += 1_000;
+    const second = await quota.reserve("redis-user");
+    now += 1_000;
+    const third = await quota.reserve("redis-user");
+    assert.deepEqual([first.allowed, second.allowed, third.allowed], [true, true, false]);
+    await first.release();
+    now += 1_000;
+    assert.equal((await quota.reserve("redis-user")).allowed, true);
+    const history = await store.history("redis-user", 1_699_999_900_000);
+    assert.deepEqual(history, [1_700_000_001_000, 1_700_000_003_000]);
+
+    const concurrent = await Promise.all(Array.from({ length: 10 }, (_, index) =>
+      store.reserve("redis-concurrent", 1_700_000_100_000 + index, 1_700_000_000_000, 3)
+    ));
+    assert.equal(concurrent.filter(Boolean).length, 3);
+  } finally {
+    await client.del(...keys).catch(() => {});
+    await client.quit().catch(() => client.disconnect());
   }
 });
 
