@@ -1,25 +1,26 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { Pool } from "pg";
 import { TrackAttributes } from "../../sync/entry";
-import { DIAGNOSIS_SCHEMA, formatQuota, GeminiStudioAgent, normalizeDiagnosis, QuotaExceededError, UserQuotaManager } from "./gemini-adapter";
+import { DIAGNOSIS_SCHEMA, formatQuota, GeminiStudioAgent, normalizeDiagnosis, PgQuotaStore, QuotaExceededError, QuotaStore, UserQuotaManager } from "./gemini-adapter";
 
 const track: TrackAttributes = { name: "Song", artist: "Band", tags: ["hyperpop", "glitch"], bpm: 160, danceability: 0.8 };
 
-test("quota is a rolling window per user", () => {
+test("quota is a rolling window per user", async () => {
   let now = 1_000_000;
   const quota = new UserQuotaManager(2, 60_000, () => now);
-  assert.equal(quota.consumeQuota("a"), true);
+  assert.equal((await quota.reserve("a")).allowed, true);
   now += 10_000;
-  assert.equal(quota.consumeQuota("a"), true);
-  assert.equal(quota.consumeQuota("a"), false);
-  assert.equal(quota.consumeQuota("b"), true);
-  const status = quota.checkQuota("a");
+  assert.equal((await quota.reserve("a")).allowed, true);
+  assert.equal((await quota.reserve("a")).allowed, false);
+  assert.equal((await quota.reserve("b")).allowed, true);
+  const status = await quota.checkQuota("a");
   assert.deepEqual([status.used, status.remaining, status.resetInMs], [2, 0, 50_000]);
   assert.equal(formatQuota(status), "0/2 remaining (resets in 1m)");
   now += 50_001;
-  assert.equal(quota.checkQuota("a").remaining, 1);
-  assert.equal(quota.consumeQuota("a", true), true);
-  assert.equal(quota.checkQuota("a").used, 1);
+  assert.equal((await quota.checkQuota("a")).remaining, 1);
+  assert.equal((await quota.reserve("a", true)).allowed, true);
+  assert.equal((await quota.checkQuota("a")).used, 1);
 });
 
 test("bad quota env values fall back to the defaults", () => {
@@ -31,14 +32,25 @@ test("bad quota env values fall back to the defaults", () => {
   }
 });
 
-test("without an API key the heuristic diagnoses and the quota still counts", async () => {
+test("without an API key heuristic diagnoses are free", async () => {
   const agent = new GeminiStudioAgent("", new UserQuotaManager(1));
-  const { diagnosis, quota } = await agent.diagnose(track, ["a", "b"], "u1", { originalSound: true, videoOnly: true });
-  assert.equal(diagnosis.source, "heuristic");
-  assert.equal(diagnosis.genre.primaryGenre, "Hyperpop / Glitch-Core");
-  assert.equal(quota.remaining, 0);
-  await assert.rejects(agent.diagnose(track, [], "u1"), QuotaExceededError);
+  for (let i = 0; i < 3; i++) {
+    const { diagnosis, quota } = await agent.diagnose(track, ["a", "b"], "u1", { originalSound: true, videoOnly: true });
+    assert.equal(diagnosis.source, "heuristic");
+    assert.equal(diagnosis.genre.primaryGenre, "Hyperpop / Glitch-Core");
+    assert.equal(quota.used, 0);
+  }
   assert.equal((await agent.diagnose(track, [], "u1", { bypassQuota: true })).quota.unlimited, true);
+});
+
+test("successful Gemini diagnoses reserve quota atomically", async () => {
+  const fetchImpl = (async () => new Response(JSON.stringify({
+    candidates: [{ content: { parts: [{ text: JSON.stringify({}) }] } }]
+  }), { status: 200 })) as unknown as typeof fetch;
+  const agent = new GeminiStudioAgent("key", new UserQuotaManager(2), { fetchImpl });
+  assert.equal((await agent.diagnose(track, [], "gemini-user")).diagnosis.source, "gemini");
+  assert.equal((await agent.diagnose(track, [], "gemini-user")).diagnosis.source, "gemini");
+  await assert.rejects(agent.diagnose(track, [], "gemini-user"), QuotaExceededError);
 });
 
 test("Gemini output is requested with a schema and normalized", async () => {
@@ -71,14 +83,65 @@ test("Gemini output is requested with a schema and normalized", async () => {
 });
 
 test("a failing Gemini call falls back to the heuristic", async () => {
-  const fetchImpl = (async () => new Response("quota", { status: 429 })) as unknown as typeof fetch;
-  const agent = new GeminiStudioAgent("key", new UserQuotaManager(5), { fetchImpl });
+  const fetchImpl = (async () => new Response("unavailable", { status: 500 })) as unknown as typeof fetch;
+  const agent = new GeminiStudioAgent("key", new UserQuotaManager(1), { fetchImpl });
   const warn = console.warn;
   console.warn = () => {};
   try {
     assert.equal((await agent.diagnose(track, [], "u3")).diagnosis.source, "heuristic");
+    const second = await agent.diagnose(track, [], "u3");
+    assert.equal(second.diagnosis.source, "heuristic");
+    assert.equal(second.quota.used, 0);
   } finally {
     console.warn = warn;
+  }
+});
+
+test("quota manager falls back to its memory store when the configured store fails", async () => {
+  const failure = async (): Promise<never> => { throw new Error("store offline"); };
+  const store: QuotaStore = {
+    history: failure,
+    reserve: failure,
+    release: failure
+  };
+  const quota = new UserQuotaManager(1, undefined, undefined, store);
+  const warn = console.warn;
+  console.warn = () => {};
+  try {
+    assert.equal((await quota.reserve("fallback-user")).allowed, true);
+    assert.equal((await quota.reserve("fallback-user")).allowed, false);
+    assert.equal((await quota.checkQuota("fallback-user")).used, 1);
+  } finally {
+    console.warn = warn;
+  }
+});
+
+const testDatabaseUrl = process.env.TEST_DATABASE_URL;
+test("Postgres quota store reserves atomically, releases usage, and returns ordered history", { skip: !testDatabaseUrl }, async () => {
+  const pool = new Pool({ connectionString: testDatabaseUrl });
+  try {
+    await pool.query("DROP TABLE IF EXISTS studio_quota_usage");
+    const store = new PgQuotaStore(pool);
+    let now = 1_700_000_000_000;
+    const quota = new UserQuotaManager(2, 60_000, () => now, store);
+    const first = await quota.reserve("pg-user");
+    now += 1_000;
+    const second = await quota.reserve("pg-user");
+    now += 1_000;
+    const third = await quota.reserve("pg-user");
+    assert.deepEqual([first.allowed, second.allowed, third.allowed], [true, true, false]);
+    await first.release();
+    now += 1_000;
+    assert.equal((await quota.reserve("pg-user")).allowed, true);
+    const history = await store.history("pg-user", 1_699_999_900_000);
+    assert.deepEqual(history, [1_700_000_001_000, 1_700_000_003_000]);
+
+    const concurrent = await Promise.all(Array.from({ length: 10 }, (_, index) =>
+      store.reserve("pg-concurrent", 1_700_000_100_000 + index, 1_700_000_000_000, 3)
+    ));
+    assert.equal(concurrent.filter(Boolean).length, 3);
+  } finally {
+    await pool.end();
   }
 });
 

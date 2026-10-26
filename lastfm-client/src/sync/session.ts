@@ -256,7 +256,7 @@ async function companionStudio(action: "studio-diagnose" | "studio-quota", body:
   }
   const userId = `companion:${studio.userId}`;
   if (action === "studio-quota") {
-    const quota = defaultGeminiAgent.quotaManager.checkQuota(userId);
+    const quota = await defaultGeminiAgent.quotaManager.checkQuota(userId);
     return { status: 200, body: { quota, summary: formatQuota(quota) } };
   }
   const track = await lookupTrack(request);

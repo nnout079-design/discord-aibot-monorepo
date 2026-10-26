@@ -212,25 +212,43 @@ async function render(args: StudioArgs): Promise<void> {
   }
 }
 
-// Bot diagnosis (Gemini, or the bot's heuristic) for the song and videos; counts against the user's studio quota.
-async function diagnose(args: StudioArgs, descriptions: string[]): Promise<{ diagnosis: InflictionDiagnosis; track?: Track; bpm?: number | null }> {
+// Bot diagnosis (Gemini, or the bot's heuristic) for the song and videos.
+export async function diagnose(
+  args: StudioArgs,
+  descriptions: string[],
+  fetchImpl: typeof fetch = fetch
+): Promise<{ diagnosis: InflictionDiagnosis; track?: Track; bpm?: number | null }> {
   const token = process.env.COMPANION_TOKEN;
-  if (!token || (!args.username && !args.artist)) {
-    console.log(token ? "No song= or user=: using the default choreography." : "No COMPANION_TOKEN in .env: using the default choreography.");
+  if (!token) {
+    console.log("No COMPANION_TOKEN in .env: using the default choreography.");
+    return { diagnosis: DEFAULT_DIAGNOSIS };
+  }
+  if (!args.username) {
+    console.log("Add user=<your Last.fm name> to get a bot diagnosis (quota is per user); using the default choreography.");
     return { diagnosis: DEFAULT_DIAGNOSIS };
   }
   const botUrl = (process.env.BOT_URL ?? "https://lastfm-client-bot.fly.dev").replace(/\/$/, "");
-  const response = await fetch(`${botUrl}/sync/studio/diagnose`, {
-    method: "POST",
-    headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
-    body: JSON.stringify({
-      ...(args.username && !args.artist ? { username: args.username } : { artist: args.artist, title: args.title }),
-      userId: args.username ?? "cli", videos: descriptions, originalSound: args.originalSound
-    }),
-    signal: AbortSignal.timeout(45000)
-  }).catch(error => { throw new Error(`Could not reach the bot for a diagnosis: ${error instanceof Error ? error.message : error}`); });
+  const fallback = (reason: string) => {
+    console.warn(`Bot diagnosis unavailable (${reason}); using the default choreography.`);
+    return { diagnosis: DEFAULT_DIAGNOSIS };
+  };
+  let response: Response;
+  try {
+    response = await fetchImpl(`${botUrl}/sync/studio/diagnose`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+      body: JSON.stringify({
+        ...(args.username && !args.artist ? { username: args.username } : { artist: args.artist, title: args.title }),
+        userId: args.username, videos: descriptions, originalSound: args.originalSound
+      }),
+      signal: AbortSignal.timeout(45000)
+    });
+  } catch (error) {
+    return fallback(error instanceof Error ? error.message : String(error));
+  }
   const json = await response.json().catch(() => ({})) as { diagnosis?: InflictionDiagnosis; track?: Track; bpm?: number | null; summary?: string; error?: string };
-  if (!response.ok || !json.diagnosis) throw new Error(json.error ?? `bot returned ${response.status}`);
+  if (!response.ok) return fallback(json.error ?? `bot returned ${response.status}`);
+  if (!json.diagnosis) return fallback(json.error ?? "response did not include a diagnosis");
   console.log(`Diagnosis by ${json.diagnosis.source === "gemini" ? json.diagnosis.model : "the bot's heuristic"}; quota ${json.summary ?? "n/a"}`);
   return { diagnosis: json.diagnosis, track: json.track, bpm: json.bpm };
 }

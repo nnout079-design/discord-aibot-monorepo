@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { parseStudioArgs } from "./studio";
+import { diagnose, parseStudioArgs } from "./studio";
 import { audioCodecArgs, collisionWindow, DEFAULT_DIAGNOSIS, inflictFilter } from "./studio/inflict";
 
 test("inflict args", () => {
@@ -15,6 +15,81 @@ test("inflict args", () => {
   assert.throws(() => parseStudioArgs(["inflict", "videos=a.mp4,b.mp4", "original=0"]), /needs song= or user=/);
   assert.throws(() => parseStudioArgs(["inflict", "videos=a.mp4,b.mp4", "blend=multiply"]), /blend must be one of/);
   assert.equal(parseStudioArgs(["inflict", "videos=a.mp4,b.mp4"]).originalSound, true);
+});
+
+test("studio diagnosis needs a username when the bot token is configured", async () => {
+  const previousToken = process.env.COMPANION_TOKEN;
+  process.env.COMPANION_TOKEN = "test-token";
+  let called = false;
+  const args = parseStudioArgs(["inflict", "song=Artist - Title", "videos=a.mp4,b.mp4"]);
+  try {
+    const result = await diagnose(args, ["a", "b"], (async () => {
+      called = true;
+      return new Response();
+    }) as typeof fetch);
+    assert.deepEqual(result.diagnosis, DEFAULT_DIAGNOSIS);
+    assert.equal(called, false);
+  } finally {
+    if (previousToken === undefined) delete process.env.COMPANION_TOKEN;
+    else process.env.COMPANION_TOKEN = previousToken;
+  }
+});
+
+test("studio diagnosis falls back when the bot rejects the request", async () => {
+  const previousToken = process.env.COMPANION_TOKEN;
+  const previousWarn = console.warn;
+  process.env.COMPANION_TOKEN = "test-token";
+  console.warn = () => {};
+  try {
+    const args = parseStudioArgs(["inflict", "user=listener", "videos=a.mp4,b.mp4"]);
+    const result = await diagnose(args, ["a", "b"], (async () =>
+      new Response(JSON.stringify({ error: "Usage quota reached" }), { status: 429 })
+    ) as typeof fetch);
+    assert.deepEqual(result.diagnosis, DEFAULT_DIAGNOSIS);
+  } finally {
+    console.warn = previousWarn;
+    if (previousToken === undefined) delete process.env.COMPANION_TOKEN;
+    else process.env.COMPANION_TOKEN = previousToken;
+  }
+});
+
+test("studio diagnosis falls back when the bot is unreachable", async () => {
+  const previousToken = process.env.COMPANION_TOKEN;
+  const previousWarn = console.warn;
+  process.env.COMPANION_TOKEN = "test-token";
+  console.warn = () => {};
+  try {
+    const args = parseStudioArgs(["inflict", "user=listener", "videos=a.mp4,b.mp4"]);
+    const result = await diagnose(args, ["a", "b"], (async () => {
+      throw new Error("offline");
+    }) as typeof fetch);
+    assert.deepEqual(result.diagnosis, DEFAULT_DIAGNOSIS);
+  } finally {
+    console.warn = previousWarn;
+    if (previousToken === undefined) delete process.env.COMPANION_TOKEN;
+    else process.env.COMPANION_TOKEN = previousToken;
+  }
+});
+
+test("studio diagnosis sends the username and uses the bot response", async () => {
+  const previousToken = process.env.COMPANION_TOKEN;
+  const previousLog = console.log;
+  process.env.COMPANION_TOKEN = "test-token";
+  console.log = () => {};
+  let body: Record<string, unknown> | undefined;
+  try {
+    const args = parseStudioArgs(["inflict", "user=listener", "videos=a.mp4,b.mp4"]);
+    const result = await diagnose(args, ["a", "b"], (async (_input: RequestInfo | URL, init?: RequestInit) => {
+      body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      return new Response(JSON.stringify({ diagnosis: DEFAULT_DIAGNOSIS }), { status: 200 });
+    }) as typeof fetch);
+    assert.deepEqual(result.diagnosis, DEFAULT_DIAGNOSIS);
+    assert.equal(body?.userId, "listener");
+  } finally {
+    console.log = previousLog;
+    if (previousToken === undefined) delete process.env.COMPANION_TOKEN;
+    else process.env.COMPANION_TOKEN = previousToken;
+  }
 });
 
 test("collision windows and original-sound codec", () => {

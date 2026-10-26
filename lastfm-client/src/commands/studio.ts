@@ -54,11 +54,11 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
   const bypassQuota = interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild) ?? false;
   const quotaManager = defaultGeminiAgent.quotaManager;
   if (interaction.options.getSubcommand() === "quota") {
-    await interaction.reply({ content: `Studio diagnoses: ${formatQuota(quotaManager.checkQuota(interaction.user.id, bypassQuota))}`, ephemeral: true });
+    await interaction.reply({ content: `Studio diagnoses: ${formatQuota(await quotaManager.checkQuota(interaction.user.id, bypassQuota))}`, ephemeral: true });
     return;
   }
-  const status = quotaManager.checkQuota(interaction.user.id, bypassQuota);
-  if (!status.allowed) {
+  const status = await quotaManager.checkQuota(interaction.user.id, bypassQuota);
+  if (defaultGeminiAgent.configured && !status.allowed) {
     await interaction.reply({ content: `Quota reached: ${formatQuota(status)}. Try again <t:${Math.ceil(status.resetAt / 1000)}:R>.`, ephemeral: true });
     return;
   }

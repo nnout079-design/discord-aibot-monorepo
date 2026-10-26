@@ -1,3 +1,4 @@
+import { Pool } from "pg";
 import { TrackAttributes } from "../../sync/entry";
 
 export interface GenreDiagnosis {
@@ -81,32 +82,144 @@ export function formatQuota(status: UserQuotaStatus): string {
   return `${status.remaining}/${status.limit} remaining${resets}`;
 }
 
-// Rolling-window usage per user (Discord ID or companion user); in memory, so it resets when the bot restarts.
+export interface QuotaStore {
+  history(userId: string, since: number): Promise<number[]>;
+  reserve(userId: string, at: number, since: number, limit: number): Promise<boolean>;
+  release(userId: string, at: number): Promise<void>;
+}
+
+export class MemoryQuotaStore implements QuotaStore {
+  private usage = new Map<string, number[]>();
+
+  async history(userId: string, since: number): Promise<number[]> {
+    return (this.usage.get(userId) ?? []).filter(at => at > since).sort((a, b) => a - b);
+  }
+
+  async reserve(userId: string, at: number, since: number, limit: number): Promise<boolean> {
+    const history = (this.usage.get(userId) ?? []).filter(timestamp => timestamp > since).sort((a, b) => a - b);
+    if (history.length >= limit) {
+      this.usage.set(userId, history);
+      return false;
+    }
+    this.usage.set(userId, [...history, at].sort((a, b) => a - b));
+    return true;
+  }
+
+  async release(userId: string, at: number): Promise<void> {
+    const history = this.usage.get(userId) ?? [];
+    const index = history.indexOf(at);
+    if (index >= 0) history.splice(index, 1);
+    if (history.length) this.usage.set(userId, history);
+    else this.usage.delete(userId);
+  }
+}
+
+export class PgQuotaStore implements QuotaStore {
+  private schemaReady?: Promise<void>;
+
+  constructor(private pool: Pool) {}
+
+  private ensureSchema(): Promise<void> {
+    this.schemaReady ??= (async () => {
+      await this.pool.query("CREATE TABLE IF NOT EXISTS studio_quota_usage (id bigserial PRIMARY KEY, user_id text NOT NULL, used_at timestamptz NOT NULL)");
+      await this.pool.query("CREATE INDEX IF NOT EXISTS studio_quota_usage_user_time ON studio_quota_usage (user_id, used_at)");
+    })();
+    return this.schemaReady;
+  }
+
+  async history(userId: string, since: number): Promise<number[]> {
+    await this.ensureSchema();
+    const result = await this.pool.query<{ used_at: number }>(
+      "SELECT (extract(epoch from used_at) * 1000)::float8 AS used_at FROM studio_quota_usage WHERE user_id = $1 AND used_at > to_timestamp($2 / 1000.0) ORDER BY used_at",
+      [userId, since]
+    );
+    return result.rows.map(row => Math.round(Number(row.used_at)));
+  }
+
+  async reserve(userId: string, at: number, since: number, limit: number): Promise<boolean> {
+    await this.ensureSchema();
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [userId]);
+      await client.query(
+        "DELETE FROM studio_quota_usage WHERE user_id = $1 AND used_at <= to_timestamp($2 / 1000.0)",
+        [userId, since]
+      );
+      const result = await client.query<{ count: string }>(
+        "SELECT count(*) AS count FROM studio_quota_usage WHERE user_id = $1 AND used_at > to_timestamp($2 / 1000.0)",
+        [userId, since]
+      );
+      const allowed = Number(result.rows[0]?.count ?? 0) < limit;
+      if (allowed) {
+        await client.query(
+          "INSERT INTO studio_quota_usage (user_id, used_at) VALUES ($1, to_timestamp($2 / 1000.0))",
+          [userId, at]
+        );
+      }
+      await client.query("COMMIT");
+      return allowed;
+    } catch (error) {
+      await client.query("ROLLBACK").catch(() => {});
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async release(userId: string, at: number): Promise<void> {
+    await this.ensureSchema();
+    await this.pool.query(
+      "DELETE FROM studio_quota_usage WHERE id = (SELECT id FROM studio_quota_usage WHERE user_id = $1 AND used_at = to_timestamp($2 / 1000.0) LIMIT 1)",
+      [userId, at]
+    );
+  }
+}
+
+export function createQuotaStore(env = process.env): QuotaStore {
+  return env.DATABASE_URL ? new PgQuotaStore(new Pool({ connectionString: env.DATABASE_URL })) : new MemoryQuotaStore();
+}
+
 export class UserQuotaManager {
-  private userUsage = new Map<string, number[]>();
+  private backupStore = new MemoryQuotaStore();
   readonly limit: number;
   readonly windowMs: number;
   private adminUsers: Set<string>;
 
-  constructor(limit = 5, windowMs = 24 * 60 * 60 * 1000, private now: () => number = Date.now) {
+  constructor(
+    limit = 5,
+    windowMs = 24 * 60 * 60 * 1000,
+    private now: () => number = Date.now,
+    private store: QuotaStore = new MemoryQuotaStore()
+  ) {
     this.limit = Math.floor(positive(process.env.STUDIO_USER_QUOTA_LIMIT, limit));
     this.windowMs = positive(process.env.STUDIO_USER_QUOTA_WINDOW_MS, windowMs);
     const admins = (process.env.STUDIO_QUOTA_ADMINS ?? "").split(",").map(s => s.trim()).filter(Boolean);
     this.adminUsers = new Set(admins);
   }
 
-  checkQuota(userId: string, bypass = false): UserQuotaStatus {
+  private warnStoreFailure(error: unknown): void {
+    console.warn(`Studio quota store failed, using in-memory quota: ${error instanceof Error ? error.message : String(error)}`);
+  }
+
+  private async history(userId: string, since: number): Promise<number[]> {
+    try {
+      return await this.store.history(userId, since);
+    } catch (error) {
+      this.warnStoreFailure(error);
+      return this.backupStore.history(userId, since);
+    }
+  }
+
+  async checkQuota(userId: string, bypass = false): Promise<UserQuotaStatus> {
     const now = this.now();
     if (bypass || this.adminUsers.has(userId)) {
       return { allowed: true, userId, used: 0, limit: this.limit, remaining: this.limit, resetAt: now, resetInMs: 0, unlimited: true };
     }
     const cutoff = now - this.windowMs;
-    const history = (this.userUsage.get(userId) ?? []).filter(ts => ts > cutoff);
-    if (history.length) this.userUsage.set(userId, history);
-    else this.userUsage.delete(userId);
-
-    const used = history.length;
-    const resetAt = (history[0] ?? now) + this.windowMs;
+    const usage = await this.history(userId, cutoff);
+    const used = usage.length;
+    const resetAt = (usage[0] ?? now) + this.windowMs;
     return {
       allowed: used < this.limit,
       userId,
@@ -119,12 +232,31 @@ export class UserQuotaManager {
     };
   }
 
-  consumeQuota(userId: string, bypass = false): boolean {
-    const status = this.checkQuota(userId, bypass);
-    if (!status.allowed) return false;
-    if (status.unlimited) return true;
-    this.userUsage.set(userId, [...(this.userUsage.get(userId) ?? []), this.now()]);
-    return true;
+  async reserve(userId: string, bypass = false): Promise<{ allowed: boolean; release: () => Promise<void> }> {
+    if (bypass || this.adminUsers.has(userId)) return { allowed: true, release: async () => {} };
+    const at = this.now();
+    const since = at - this.windowMs;
+    let reservationStore = this.store;
+    let allowed: boolean;
+    try {
+      allowed = await this.store.reserve(userId, at, since, this.limit);
+    } catch (error) {
+      this.warnStoreFailure(error);
+      reservationStore = this.backupStore;
+      allowed = await this.backupStore.reserve(userId, at, since, this.limit);
+    }
+    return {
+      allowed,
+      release: async () => {
+        if (!allowed) return;
+        try {
+          await reservationStore.release(userId, at);
+        } catch (error) {
+          this.warnStoreFailure(error);
+          await this.backupStore.release(userId, at);
+        }
+      }
+    };
   }
 }
 
@@ -272,27 +404,29 @@ export class GeminiStudioAgent {
     return Boolean(this.apiKey);
   }
 
-  // Takes one quota run up front (so concurrent requests can't overshoot), then asks Gemini;
-  // without a key or when the call fails it falls back to the tag/BPM heuristic.
+  // Only successful Gemini diagnoses use quota; heuristic answers are free.
   async diagnose(
     track: TrackAttributes,
     videoDescriptions?: string[],
     userId = "default",
     options: DiagnoseOptions = {}
   ): Promise<{ diagnosis: VideoInflictionPlan; quota: UserQuotaStatus }> {
-    if (!this.quotaManager.consumeQuota(userId, options.bypassQuota)) {
-      throw new QuotaExceededError(this.quotaManager.checkQuota(userId));
-    }
     const fallback = this.heuristicDiagnosis(track, videoDescriptions, options);
-    let diagnosis = fallback;
-    if (this.apiKey) {
-      try {
-        diagnosis = { ...fallback, ...normalizeDiagnosis(await this.callGemini(track, videoDescriptions), fallback), source: "gemini" };
-      } catch (error) {
-        console.warn(`Gemini (${this.model}) diagnosis failed, using heuristic diagnosis:`, error instanceof Error ? error.message : error);
-      }
+    if (!this.apiKey) {
+      return { diagnosis: fallback, quota: await this.quotaManager.checkQuota(userId, options.bypassQuota) };
     }
-    return { diagnosis, quota: this.quotaManager.checkQuota(userId, options.bypassQuota) };
+    const reservation = await this.quotaManager.reserve(userId, options.bypassQuota);
+    if (!reservation.allowed) {
+      throw new QuotaExceededError(await this.quotaManager.checkQuota(userId, options.bypassQuota));
+    }
+    let diagnosis = fallback;
+    try {
+      diagnosis = { ...fallback, ...normalizeDiagnosis(await this.callGemini(track, videoDescriptions), fallback), source: "gemini" };
+    } catch (error) {
+      await reservation.release();
+      console.warn(`Gemini (${this.model}) diagnosis failed, using heuristic diagnosis:`, error instanceof Error ? error.message : error);
+    }
+    return { diagnosis, quota: await this.quotaManager.checkQuota(userId, options.bypassQuota) };
   }
 
   private async callGemini(track: TrackAttributes, videoDescriptions?: string[]): Promise<unknown> {
@@ -435,4 +569,4 @@ export class GeminiStudioAgent {
   }
 }
 
-export const defaultGeminiAgent = new GeminiStudioAgent();
+export const defaultGeminiAgent = new GeminiStudioAgent(undefined, new UserQuotaManager(undefined, undefined, undefined, createQuotaStore()));
