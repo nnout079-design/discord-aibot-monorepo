@@ -2,13 +2,15 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   camoEffectiveness,
+  DEFAULT_TUNING,
   DEMO_SCENE,
   exposureAt,
   formatStealthPlan,
   illuminationAt,
   parseStealthScene,
   runStealthCircuit,
-  StealthScene
+  StealthScene,
+  updateLitTimer
 } from "../src/gaming/stealth-circuit";
 
 const baseScene = (overrides: Partial<StealthScene> = {}): StealthScene => ({
@@ -105,6 +107,98 @@ test("demo plan chooses the dark alley and uses full camouflage", () => {
   assert.equal(plan.target?.spotId, "dark alley");
   assert.equal(plan.camo.mode, "full");
   assert.ok(plan.actions.some(action => action.includes("Leave the light of streetlamp")));
+  assert.ok(plan.shootOut);
+  assert.ok(plan.actions.some(action => action.includes("Shoot out streetlamp #0")));
+});
+
+test("shoots out a nearby shootable light after the timer when threats are clear", () => {
+  const plan = runStealthCircuit(baseScene({
+    ambientLight: 0,
+    lights: [{ kind: "streetlamp", x: 0, y: 0, intensity: 1, radius: 8, shootable: true }],
+    spots: [{ id: "alley", x: 20, y: 0, cover: 1, terrain: "urban" }],
+    secondsLit: 6
+  }));
+
+  assert.equal(plan.shootOut?.index, 0);
+  assert.equal(plan.shootOut?.exposureAfter, 0);
+  assert.ok(plan.actions.some(action => action.includes("Shoot out streetlamp #0")));
+});
+
+test("holds fire until the timer when dark cover exists", () => {
+  const plan = runStealthCircuit(baseScene({
+    ambientLight: 0,
+    lights: [{ kind: "lamp", x: 0, y: 0, intensity: 1, radius: 8, shootable: true }],
+    spots: [{ id: "dark", x: 20, y: 0, cover: 1, terrain: "urban" }],
+    secondsLit: 2
+  }));
+
+  assert.equal(plan.shootOut, null);
+  assert.ok(plan.actions.some(action => action.includes("Holding fire on lights — will shoot out lamp #0 after 4s")));
+});
+
+test("shoots immediately when no dark candidate exists", () => {
+  const plan = runStealthCircuit(baseScene({
+    ambientLight: 0,
+    lights: [{ kind: "lamp", x: 0, y: 0, intensity: 1, radius: 20, shootable: true }],
+    spots: [{ id: "lit", x: 1, y: 0, cover: 0, terrain: "urban" }],
+    secondsLit: 0
+  }));
+
+  assert.ok(plan.shootOut);
+});
+
+test("does not shoot out a light when a threat is within the reveal radius", () => {
+  const plan = runStealthCircuit(baseScene({
+    ambientLight: 0,
+    lights: [{ kind: "lamp", x: 0, y: 0, intensity: 1, radius: 8, shootable: true }],
+    threats: [{ x: 4, y: 0 }],
+    secondsLit: 8
+  }));
+
+  assert.equal(plan.shootOut, null);
+  assert.ok(plan.actions.includes("Too close to 1 threat(s) to shoot out lights — stay mobile"));
+});
+
+test("never shoots out a muzzle flash", () => {
+  const plan = runStealthCircuit(baseScene({
+    ambientLight: 0,
+    lights: [{ kind: "muzzle flash", x: 0, y: 0, intensity: 1, radius: 8, shootable: true }],
+    secondsLit: 8
+  }));
+
+  assert.equal(plan.shootOut, null);
+});
+
+test("tuning can make otherwise unflagged lights shootable", () => {
+  const plan = runStealthCircuit(baseScene({
+    ambientLight: 0,
+    lights: [{ kind: "lamp", x: 0, y: 0, intensity: 1, radius: 8 }],
+    secondsLit: 8
+  }), { ...DEFAULT_TUNING, lightsShootable: true });
+
+  assert.equal(plan.shootOut?.kind, "lamp");
+});
+
+test("light weight and camouflage multiplier adjust exposure", () => {
+  const scene = baseScene({
+    ambientLight: 0,
+    lights: [{ x: 0, y: 0, intensity: 0.6, radius: 10 }]
+  });
+  const normal = runStealthCircuit(scene);
+  const dimmer = runStealthCircuit(scene, { ...DEFAULT_TUNING, lightWeight: 0.5 });
+  const strongerCamo = runStealthCircuit(scene, { ...DEFAULT_TUNING, camoMultiplier: 1.25 });
+
+  assert.ok(dimmer.currentExposure < normal.currentExposure);
+  assert.ok(strongerCamo.currentExposure < normal.currentExposure);
+});
+
+test("lit timer measures continuous exposure and resets when no longer lit", () => {
+  const key = "timer-test";
+
+  assert.equal(updateLitTimer(key, true, 1000), 0);
+  assert.equal(updateLitTimer(key, true, 3500), 2.5);
+  assert.equal(updateLitTimer(key, false, 4000), 0);
+  assert.equal(updateLitTimer(key, true, 5000), 0);
 });
 
 test("stealth plan output is Discord-friendly and bounded", () => {
@@ -151,13 +245,31 @@ test("scene parser enforces collection, identifier, and camouflage limits", () =
 test("scene parser clamps intensity, coverage, and cover", () => {
   const parsed = parseStealthScene({
     agent: { x: 0, y: 0 },
-    lights: [{ x: 0, y: 0, intensity: 2, radius: 1 }],
+    lights: [{ x: 0, y: 0, intensity: 2, radius: 1, shootable: true }],
     spots: [{ id: "spot", x: 1, y: 0, cover: -1 }],
     threats: [],
-    camo: { pattern: "digital", coverage: 2, terrains: [] }
+    camo: { pattern: "digital", coverage: 2, terrains: [] },
+    secondsLit: 2.5
   });
 
   assert.equal(parsed?.lights[0].intensity, 1);
+  assert.equal(parsed?.lights[0].shootable, true);
   assert.equal(parsed?.spots[0].cover, 0);
   assert.equal(parsed?.camo.coverage, 1);
+  assert.equal(parsed?.secondsLit, 2.5);
+  assert.equal(parseStealthScene({
+    agent: { x: 0, y: 0 },
+    lights: [{ x: 0, y: 0, intensity: 1, radius: 1, shootable: "yes" }],
+    spots: [],
+    threats: [],
+    camo: { pattern: "digital", coverage: 0.5, terrains: [] }
+  }), undefined);
+  assert.equal(parseStealthScene({
+    agent: { x: 0, y: 0 },
+    lights: [],
+    spots: [],
+    threats: [],
+    camo: { pattern: "digital", coverage: 0.5, terrains: [] },
+    secondsLit: -1
+  }), undefined);
 });

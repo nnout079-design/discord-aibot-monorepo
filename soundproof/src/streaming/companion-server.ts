@@ -2,12 +2,13 @@ import express, { Request, Response } from "express";
 import OpenAI from "openai";
 import { Client, TextChannel } from "discord.js";
 import { detectGameFromText } from "../gaming/epic";
+import { getOrRefreshTuning } from "../gaming/changelog";
 import { normalizeTelemetry, updateGameState } from "../gaming/game-state";
 import { evaluateGameRules } from "../gaming/rules";
 import { fetchStarCitizenTelemetry } from "../gaming/star-citizen";
 import { analyzeDeath, getDiagnosticSummary, hashObservation, recordDiagnostic, recordDiagnosticFeedback, requestReaInvestigation } from "../gaming/diagnostics";
 import { sendPushbulletNote } from "../notifications/pushbullet";
-import { parseStealthScene, recordStealthPlan, runStealthCircuit } from "../gaming/stealth-circuit";
+import { illuminationAt, LIT_THRESHOLD, parseStealthScene, recordStealthPlan, runStealthCircuit, updateLitTimer } from "../gaming/stealth-circuit";
 import { detectVehicleNoise } from "./audio-events-client";
 import { handleVehicleDetection } from "./vehicle-callback";
 
@@ -170,16 +171,21 @@ export function startCompanionServer(): void {
       return;
     }
 
-    const plan = runStealthCircuit(scene);
+    const game = typeof body.game === "string" ? body.game.trim().toLowerCase() : "unknown";
+    const tuning = await getOrRefreshTuning(game);
+    if (scene.secondsLit === undefined) {
+      const lit = illuminationAt(scene.agent, scene.lights, scene.ambientLight ?? 0.1, tuning) >= LIT_THRESHOLD;
+      scene.secondsLit = updateLitTimer(`${guildId}:${scene.agent.id ?? "agent"}`, lit);
+    }
+    const plan = runStealthCircuit(scene, tuning);
     recordStealthPlan(guildId, plan);
-    const game = typeof body.game === "string" ? body.game : "unknown";
     const state = updateGameState({
       guildId,
       channelId,
-      game: game.trim().toLowerCase(),
+      game,
       phase: "match",
       event: "stealth-plan",
-      analysis: `risk ${plan.risk} exposure ${plan.currentExposure}`,
+      analysis: `risk ${plan.risk} exposure ${plan.currentExposure}${plan.shootOut ? ` shoot out ${plan.shootOut.kind}` : ""}`,
       observedAt: new Date().toISOString()
     });
     const reaction = evaluateGameRules(state);
@@ -187,7 +193,18 @@ export function startCompanionServer(): void {
       const channel = await discordClient.channels.fetch(reaction.channelId);
       if (channel?.isTextBased()) await (channel as TextChannel).send(reaction.content);
     }
-    response.json({ plan, rule: reaction?.ruleId ?? null });
+    response.json({
+      plan,
+      rule: reaction?.ruleId ?? null,
+      tuning: {
+        lightWeight: tuning.lightWeight,
+        camoMultiplier: tuning.camoMultiplier,
+        lightsShootable: tuning.lightsShootable ?? false,
+        shootOutAfterSeconds: tuning.shootOutAfterSeconds,
+        shotRevealRadius: tuning.shotRevealRadius,
+        sources: tuning.sources.length
+      }
+    });
   });
 
   app.post("/stream/audio", async (request: Request, response: Response) => {

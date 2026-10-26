@@ -1,6 +1,6 @@
 ## Stealth circuit
 
-The `/stealth` command provides `/stealth plan` (latest server plan), `/stealth demo`, and `/stealth rules`. Authenticated `POST /stream/stealth` accepts a scene and returns the exposure plan.
+The `/stealth` command provides `/stealth plan` (latest server plan), `/stealth demo [game]`, `/stealth changelog <game> [appid] [url]`, and `/stealth rules`. Authenticated `POST /stream/stealth` accepts a scene and returns the exposure plan. When the configured game supports it, changelog tuning adjusts light intensity, camouflage effectiveness, and whether nearby lights can be shot out. Shoot out a light only when its timer has elapsed (or no dark spot exists), and avoid firing while a threat is close because the shot reveals your position.
 
 ```bash
 curl -X POST http://localhost:3000/stream/stealth \

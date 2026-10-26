@@ -7,6 +7,7 @@ export interface LightSource extends Vec2 {
   intensity: number;
   radius: number;
   kind?: string;
+  shootable?: boolean;
 }
 
 export interface CoverSpot extends Vec2 {
@@ -32,7 +33,27 @@ export interface StealthScene {
   threats: Threat[];
   camo: CamoProfile;
   ambientLight?: number;
+  secondsLit?: number;
 }
+
+export interface StealthTuning {
+  lightWeight: number;
+  camoMultiplier: number;
+  lightsShootable?: boolean;
+  shootOutAfterSeconds: number;
+  shotRevealRadius: number;
+  shootRange: number;
+  sources: Array<{ title: string; date: string; rule: string; excerpt: string }>;
+}
+
+export const DEFAULT_TUNING: StealthTuning = {
+  lightWeight: 1,
+  camoMultiplier: 1,
+  shootOutAfterSeconds: 6,
+  shotRevealRadius: 8,
+  shootRange: 25,
+  sources: []
+};
 
 export const LIT_THRESHOLD = 0.5;
 export const MOVING_CAMO_FACTOR = 0.6;
@@ -59,6 +80,7 @@ export interface StealthPlan {
   exposureReduction: number;
   camo: { mode: "full"; pattern: string; effectiveness: number };
   risk: "low" | "medium" | "high";
+  shootOut: { index: number; kind: string; distance: number; exposureAfter: number } | null;
   actions: string[];
 }
 
@@ -69,25 +91,29 @@ function distance(a: Vec2, b: Vec2): number {
   return Math.hypot(a.x - b.x, a.y - b.y);
 }
 
-export function illuminationAt(p: Vec2, lights: LightSource[], ambient = 0.1): number {
+function lightContributionAt(p: Vec2, light: LightSource, tuning: StealthTuning): number {
+  if (light.radius <= 0) return 0;
+  const remaining = Math.max(0, 1 - distance(p, light) / light.radius);
+  return light.intensity * remaining * remaining * tuning.lightWeight;
+}
+
+export function illuminationAt(p: Vec2, lights: LightSource[], ambient = 0.1, tuning: StealthTuning = DEFAULT_TUNING): number {
   const light = lights.reduce((total, source) => {
-    if (source.radius <= 0) return total;
-    const remaining = Math.max(0, 1 - distance(p, source) / source.radius);
-    return total + source.intensity * remaining * remaining;
+    return total + lightContributionAt(p, source, tuning);
   }, ambient);
   return clamp01(light);
 }
 
-export function camoEffectiveness(camo: CamoProfile, terrain: string | undefined, illumination: number, moving = false): number {
+export function camoEffectiveness(camo: CamoProfile, terrain: string | undefined, illumination: number, moving = false, tuning: StealthTuning = DEFAULT_TUNING): number {
   const terrainMatches = Boolean(terrain && camo.terrains.some(value => value.toLowerCase() === terrain.toLowerCase()));
-  const base = camo.coverage * (terrainMatches ? 1 : 0.5);
+  const base = camo.coverage * (terrainMatches ? 1 : 0.5) * tuning.camoMultiplier;
   const effective = base * (1 - 0.5 * clamp01(illumination)) * (moving ? MOVING_CAMO_FACTOR : 1);
   return Math.min(0.95, Math.max(0, effective));
 }
 
-export function exposureAt(p: Vec2, cover: number, terrain: string | undefined, scene: StealthScene, moving = false): number {
-  const illumination = illuminationAt(p, scene.lights, scene.ambientLight ?? 0.1);
-  const camouflage = camoEffectiveness(scene.camo, terrain, illumination, moving);
+export function exposureAt(p: Vec2, cover: number, terrain: string | undefined, scene: StealthScene, moving = false, tuning: StealthTuning = DEFAULT_TUNING): number {
+  const illumination = illuminationAt(p, scene.lights, scene.ambientLight ?? 0.1, tuning);
+  const camouflage = camoEffectiveness(scene.camo, terrain, illumination, moving, tuning);
   return illumination * (1 - camouflage) * (1 - clamp01(cover));
 }
 
@@ -95,7 +121,7 @@ function threatPenalty(position: Vec2, threats: Threat[]): number {
   return threats.reduce((total, threat) => total + 0.2 * Math.max(0, 1 - distance(position, threat) / 20), 0);
 }
 
-function pathExposure(agent: Vec2, spot: CoverSpot, scene: StealthScene): number {
+function pathExposure(agent: Vec2, spot: CoverSpot, scene: StealthScene, tuning: StealthTuning): number {
   let exposure = 0;
   for (let step = 1; step <= 5; step += 1) {
     const fraction = step / 5;
@@ -103,7 +129,7 @@ function pathExposure(agent: Vec2, spot: CoverSpot, scene: StealthScene): number
       x: agent.x + (spot.x - agent.x) * fraction,
       y: agent.y + (spot.y - agent.y) * fraction
     };
-    exposure += exposureAt(point, 0, scene.agent.terrain, scene, true);
+    exposure += exposureAt(point, 0, scene.agent.terrain, scene, true, tuning);
   }
   return exposure / 5;
 }
@@ -116,19 +142,19 @@ interface ScoredSpot {
   score: number;
 }
 
-export function runStealthCircuit(scene: StealthScene): StealthPlan {
+export function runStealthCircuit(scene: StealthScene, tuning: StealthTuning = DEFAULT_TUNING): StealthPlan {
   const agent = scene.agent;
-  const currentIllumination = illuminationAt(agent, scene.lights, scene.ambientLight ?? 0.1);
-  const currentExposure = exposureAt(agent, 0, agent.terrain, scene);
+  const currentIllumination = illuminationAt(agent, scene.lights, scene.ambientLight ?? 0.1, tuning);
+  const currentExposure = exposureAt(agent, 0, agent.terrain, scene, false, tuning);
   const litLights = scene.lights
     .map((light, index) => ({ index, kind: light.kind ?? "light", distance: distance(agent, light) }))
     .filter(light => light.distance <= scene.lights[light.index].radius)
     .sort((a, b) => a.distance - b.distance || a.index - b.index)
     .map(light => ({ ...light, distance: round3(light.distance) }));
   const scoredSpots: ScoredSpot[] = scene.spots.map(spot => {
-    const illumination = illuminationAt(spot, scene.lights, scene.ambientLight ?? 0.1);
-    const exposure = exposureAt(spot, spot.cover, spot.terrain, scene);
-    const routeExposure = pathExposure(agent, spot, scene);
+    const illumination = illuminationAt(spot, scene.lights, scene.ambientLight ?? 0.1, tuning);
+    const exposure = exposureAt(spot, spot.cover, spot.terrain, scene, false, tuning);
+    const routeExposure = pathExposure(agent, spot, scene, tuning);
     return {
       spot,
       exposure,
@@ -161,14 +187,66 @@ export function runStealthCircuit(scene: StealthScene): StealthPlan {
   const camo = {
     mode: "full" as const,
     pattern: scene.camo.pattern,
-    effectiveness: round3(camoEffectiveness(scene.camo, targetTerrain, targetIllumination))
+    effectiveness: round3(camoEffectiveness(scene.camo, targetTerrain, targetIllumination, false, tuning))
   };
   const risk = finalExposure < 0.15 ? "low" : finalExposure < 0.4 ? "medium" : "high";
   const actions = litLights.map(light => `Leave the light of ${light.kind} #${light.index} (${light.distance.toFixed(1)}m)`);
+  const chosenSpot = selected?.spot;
+  const eligibleLights = scene.lights
+    .map((light, index) => {
+      const kind = light.kind ?? "light";
+      const lightDistance = distance(agent, light);
+      const contribution = lightContributionAt(agent, light, tuning);
+      const onChosenPath = chosenSpot ? Array.from({ length: 5 }, (_, indexOnPath) => {
+        const fraction = (indexOnPath + 1) / 5;
+        return lightContributionAt({
+          x: agent.x + (chosenSpot.x - agent.x) * fraction,
+          y: agent.y + (chosenSpot.y - agent.y) * fraction
+        }, light, tuning) > 0;
+      }).some(Boolean) : false;
+      return { light, index, kind, distance: lightDistance, contribution, onChosenPath };
+    })
+    .filter(candidate =>
+      (candidate.light.shootable ?? tuning.lightsShootable ?? false) &&
+      !candidate.kind.toLowerCase().includes("muzzle") &&
+      candidate.distance <= tuning.shootRange &&
+      (candidate.contribution > 0 || candidate.onChosenPath)
+    )
+    .sort((a, b) => b.contribution - a.contribution || a.distance - b.distance || a.index - b.index);
+  const nearbyThreats = scene.threats.filter(threat => distance(agent, threat) <= tuning.shotRevealRadius);
+  let shootOut: StealthPlan["shootOut"] = null;
+  let shootOutExposureAfter: number | undefined;
+  let shootOutAction: string | undefined;
+  if (currentIllumination >= LIT_THRESHOLD && eligibleLights.length > 0) {
+    const candidate = eligibleLights[0];
+    if (nearbyThreats.length > 0) {
+      shootOutAction = `Too close to ${nearbyThreats.length} threat(s) to shoot out lights — stay mobile`;
+    } else if (noDarkCover || (scene.secondsLit ?? 0) >= tuning.shootOutAfterSeconds) {
+      const lights = scene.lights.filter((_, index) => index !== candidate.index);
+      const sceneAfterShot = { ...scene, lights };
+      shootOutExposureAfter = exposureAt(agent, 0, agent.terrain, sceneAfterShot, false, tuning);
+      shootOut = {
+        index: candidate.index,
+        kind: candidate.kind,
+        distance: round3(candidate.distance),
+        exposureAfter: round3(shootOutExposureAfter)
+      };
+    } else {
+      const remaining = Math.max(0, tuning.shootOutAfterSeconds - (scene.secondsLit ?? 0));
+      shootOutAction = `Holding fire on lights — will shoot out ${candidate.kind} #${candidate.index} after ${remaining.toFixed(0)}s more in the light`;
+    }
+  }
+  const holdAfterShot = Boolean(shootOut && shootOutExposureAfter !== undefined && shootOutExposureAfter < (selected?.exposure ?? currentExposure));
+  if (shootOut) {
+    actions.push(`Shoot out ${shootOut.kind} #${shootOut.index} (${shootOut.distance.toFixed(1)}m) — then relocate, the shot gives away your position`);
+    if (holdAfterShot) actions.push("Hold position after shooting");
+  } else if (shootOutAction) {
+    actions.push(shootOutAction);
+  }
   if (noDarkCover) actions.push("No dark cover available — pick the least-lit spot and minimise movement");
-  if (target) {
+  if (target && !holdAfterShot) {
     actions.push(`Move to shadow spot ${target.spotId} (exposure ${currentExposure.toFixed(2)} → ${target.exposure.toFixed(2)})`);
-  } else {
+  } else if (!holdAfterShot) {
     actions.push("Hold position in shadow");
   }
   actions.push(`Engage full camouflage (${camo.pattern}, ${Math.round(camo.effectiveness * 100)}% effective)`);
@@ -186,6 +264,7 @@ export function runStealthCircuit(scene: StealthScene): StealthPlan {
     exposureReduction: round3(currentExposure - finalExposure),
     camo,
     risk,
+    shootOut,
     actions
   };
 }
@@ -208,6 +287,7 @@ export function parseStealthScene(input: unknown): StealthScene | undefined {
   if (input.lights.length > MAX_LIGHTS || input.spots.length > MAX_SPOTS || input.threats.length > MAX_THREATS) return undefined;
   if (!finiteNumber(input.agent.x) || !finiteNumber(input.agent.y) ||
       !optionalString(input.agent, "id") || !optionalString(input.agent, "terrain")) return undefined;
+  if (input.secondsLit !== undefined && (!finiteNumber(input.secondsLit) || input.secondsLit < 0)) return undefined;
   if (!finiteNumber(input.camo.coverage) || typeof input.camo.pattern !== "string" || input.camo.pattern.length > 64 ||
       !Array.isArray(input.camo.terrains) || input.camo.terrains.length > 16 ||
       !input.camo.terrains.every(terrain => typeof terrain === "string")) return undefined;
@@ -217,13 +297,14 @@ export function parseStealthScene(input: unknown): StealthScene | undefined {
   for (const value of input.lights) {
     if (!isRecord(value) || !finiteNumber(value.x) || !finiteNumber(value.y) ||
         !finiteNumber(value.intensity) || !finiteNumber(value.radius) || value.radius <= 0 ||
-        !optionalString(value, "kind")) return undefined;
+        !optionalString(value, "kind") || (value.shootable !== undefined && typeof value.shootable !== "boolean")) return undefined;
     lights.push({
       x: value.x,
       y: value.y,
       intensity: clamp01(value.intensity),
       radius: value.radius,
-      ...(typeof value.kind === "string" ? { kind: value.kind } : {})
+      ...(typeof value.kind === "string" ? { kind: value.kind } : {}),
+      ...(typeof value.shootable === "boolean" ? { shootable: value.shootable } : {})
     });
   }
 
@@ -267,8 +348,24 @@ export function parseStealthScene(input: unknown): StealthScene | undefined {
       coverage: clamp01(input.camo.coverage),
       terrains: [...input.camo.terrains] as string[]
     },
-    ...(typeof input.ambientLight === "number" ? { ambientLight: clamp01(input.ambientLight) } : {})
+    ...(typeof input.ambientLight === "number" ? { ambientLight: clamp01(input.ambientLight) } : {}),
+    ...(typeof input.secondsLit === "number" ? { secondsLit: input.secondsLit } : {})
   };
+}
+
+const litSince = new Map<string, number>();
+
+export function updateLitTimer(key: string, lit: boolean, nowMs = Date.now()): number {
+  if (!lit) {
+    litSince.delete(key);
+    return 0;
+  }
+  const since = litSince.get(key);
+  if (since === undefined) {
+    litSince.set(key, nowMs);
+    return 0;
+  }
+  return Math.max(0, (nowMs - since) / 1000);
 }
 
 const lastPlans = new Map<string, { plan: StealthPlan; at: string }>();
@@ -279,6 +376,7 @@ function copyPlan(plan: StealthPlan): StealthPlan {
     stages: [...plan.stages] as StealthPlan["stages"],
     litLights: plan.litLights.map(light => ({ ...light })),
     target: plan.target ? { ...plan.target } : null,
+    shootOut: plan.shootOut ? { ...plan.shootOut } : null,
     camo: { ...plan.camo },
     actions: [...plan.actions]
   };
@@ -296,7 +394,7 @@ export function getLastStealthPlan(guildId: string): { plan: StealthPlan; at: st
 export const DEMO_SCENE: StealthScene = {
   agent: { id: "agent", x: 0, y: 0, terrain: "urban" },
   lights: [
-    { kind: "streetlamp", x: 0, y: 0, intensity: 1, radius: 8 },
+    { kind: "streetlamp", x: 0, y: 0, intensity: 1, radius: 8, shootable: true },
     { kind: "muzzle flash", x: 1, y: 0, intensity: 0.7, radius: 4 }
   ],
   spots: [
@@ -308,6 +406,7 @@ export const DEMO_SCENE: StealthScene = {
     { id: "threat-a", x: 7, y: 7 },
     { id: "threat-b", x: 6, y: 8 }
   ],
+  secondsLit: 8,
   camo: { pattern: "urban digital", coverage: 0.8, terrains: ["urban"] }
 };
 

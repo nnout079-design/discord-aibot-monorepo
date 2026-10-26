@@ -99,6 +99,14 @@ const rules: GameRule[] = [
     cooldownSeconds: 45
   },
   {
+    id: "stealth-shoot-out-light",
+    games: ["*"],
+    events: ["stealth-plan"],
+    keywords: ["shoot out"],
+    response: "Stealth circuit: shooting out the light — relocate right after, the shot gives away your position.",
+    cooldownSeconds: 30
+  },
+  {
     id: "stealth-high-exposure",
     games: ["*"],
     events: ["stealth-plan"],
