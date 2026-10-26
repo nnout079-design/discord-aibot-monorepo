@@ -59,7 +59,11 @@ export async function fetchSteamChangelog(appId: number, count = 10, fetchImpl: 
 export async function fetchChangelogUrl(url: string, fetchImpl: typeof fetch = fetch): Promise<ChangelogEntry[]> {
   const parsed = new URL(url);
   if (parsed.protocol !== "https:") throw new Error("changelog URL must use https");
-  const response = await fetchImpl(parsed.toString());
+  const host = parsed.hostname.toLowerCase();
+  if (host === "localhost" || host.endsWith(".internal") || host.endsWith(".local") || /^[\d.]+$/.test(host) || host.includes(":")) {
+    throw new Error("changelog URL must use a public hostname");
+  }
+  const response = await fetchImpl(parsed.toString(), { signal: AbortSignal.timeout(8000) });
   if (!response.ok) throw new Error(`Changelog request failed: ${response.status}`);
   const text = stripMarkup((await response.text()).slice(0, 200_000));
   return [{
