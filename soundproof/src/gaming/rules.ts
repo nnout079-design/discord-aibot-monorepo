@@ -92,6 +92,28 @@ const rules: GameRule[] = [
     cooldownSeconds: 30
   },
   {
+    id: "stealth-shootout",
+    games: ["*"],
+    events: ["shootout", "firefight", "gunfight"],
+    response: "Shootout detected — get out of the light, break line of sight and run full camouflage in the shadows.",
+    cooldownSeconds: 45
+  },
+  {
+    id: "stealth-high-exposure",
+    games: ["*"],
+    events: ["stealth-plan"],
+    keywords: ["risk high"],
+    response: "Stealth circuit: you're lit up and easy to target. Leave the light source and get into dark cover now.",
+    cooldownSeconds: 30
+  },
+  {
+    id: "stealth-plan",
+    games: ["*"],
+    events: ["stealth-plan"],
+    response: "Stealth circuit updated: stay out of light sources and hold full camouflage.",
+    cooldownSeconds: 60
+  },
+  {
     id: "vehicle-siren",
     games: ["*"],
     events: ["vehicle-noise"],

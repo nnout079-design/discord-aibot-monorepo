@@ -7,6 +7,7 @@ import { evaluateGameRules } from "../gaming/rules";
 import { fetchStarCitizenTelemetry } from "../gaming/star-citizen";
 import { analyzeDeath, getDiagnosticSummary, hashObservation, recordDiagnostic, recordDiagnosticFeedback, requestReaInvestigation } from "../gaming/diagnostics";
 import { sendPushbulletNote } from "../notifications/pushbullet";
+import { parseStealthScene, recordStealthPlan, runStealthCircuit } from "../gaming/stealth-circuit";
 import { detectVehicleNoise } from "./audio-events-client";
 import { handleVehicleDetection } from "./vehicle-callback";
 
@@ -149,6 +150,44 @@ export function startCompanionServer(): void {
       }, `threat:${guildId}:${reaction.ruleId}`, 300_000)
       : undefined;
     response.status(202).json({ accepted: true, capturedAt: latestFrame.capturedAt, rule: reaction?.ruleId ?? null, evidenceId: evidence.id, ...(postmortem ? { postmortem } : {}), ...(notification ? { notification: notification.status } : {}), ...(threatNotification ? { threatNotification: threatNotification.status } : {}) });
+  });
+
+  app.post("/stream/stealth", async (request: Request, response: Response) => {
+    const expectedToken = process.env.STREAM_INGEST_TOKEN;
+    if (!expectedToken || request.header("x-stream-token") !== expectedToken) {
+      response.status(401).json({ error: "unauthorized" });
+      return;
+    }
+
+    const body = request.body && typeof request.body === "object" && !Array.isArray(request.body)
+      ? request.body as { guildId?: unknown; channelId?: unknown; game?: unknown; scene?: unknown }
+      : {};
+    const guildId = typeof body.guildId === "string" ? body.guildId : "";
+    const channelId = typeof body.channelId === "string" ? body.channelId : "";
+    const scene = parseStealthScene(body.scene);
+    if (!guildId || !channelId || !scene) {
+      response.status(400).json({ error: "guildId, channelId, and a valid scene are required" });
+      return;
+    }
+
+    const plan = runStealthCircuit(scene);
+    recordStealthPlan(guildId, plan);
+    const game = typeof body.game === "string" ? body.game : "unknown";
+    const state = updateGameState({
+      guildId,
+      channelId,
+      game: game.trim().toLowerCase(),
+      phase: "match",
+      event: "stealth-plan",
+      analysis: `risk ${plan.risk} exposure ${plan.currentExposure}`,
+      observedAt: new Date().toISOString()
+    });
+    const reaction = evaluateGameRules(state);
+    if (reaction && discordClient) {
+      const channel = await discordClient.channels.fetch(reaction.channelId);
+      if (channel?.isTextBased()) await (channel as TextChannel).send(reaction.content);
+    }
+    response.json({ plan, rule: reaction?.ruleId ?? null });
   });
 
   app.post("/stream/audio", async (request: Request, response: Response) => {

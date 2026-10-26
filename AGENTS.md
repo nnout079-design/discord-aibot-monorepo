@@ -1,3 +1,14 @@
+## Stealth circuit
+
+The `/stealth` command provides `/stealth plan` (latest server plan), `/stealth demo`, and `/stealth rules`. Authenticated `POST /stream/stealth` accepts a scene and returns the exposure plan.
+
+```bash
+curl -X POST http://localhost:3000/stream/stealth \
+  -H "content-type: application/json" \
+  -H "x-stream-token: $STREAM_INGEST_TOKEN" \
+  -d '{"guildId":"...","channelId":"...","game":"example game","scene":{"agent":{"x":0,"y":0,"terrain":"urban"},"lights":[],"spots":[],"threats":[],"camo":{"pattern":"urban digital","coverage":0.8,"terrains":["urban"]}}}'
+```
+
 # Agent Notes: Mental Health Feature
 
 # Agent Notes: Vehicle-Noise Audio Events Feature
