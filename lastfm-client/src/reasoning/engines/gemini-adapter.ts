@@ -447,12 +447,32 @@ Videos: ${videoDescriptions?.filter(Boolean).join(" | ") || "two unnamed video s
 
 export interface GeminiAgentOptions {
   model?: string;
+  fallbackModels?: string[];
   fetchImpl?: typeof fetch;
   timeoutMs?: number;
 }
 
+function parseModelList(value: string | undefined): string[] | undefined {
+  return value === undefined ? undefined : value.split(",").map(model => model.trim()).filter(Boolean);
+}
+
+const RETRYABLE_GEMINI_STATUSES = new Set([404, 429, 500, 502, 503, 504]);
+
+class GeminiHttpError extends Error {
+  constructor(public status: number, message: string) {
+    super(message);
+  }
+}
+
+class GeminiNetworkError extends Error {
+  constructor(error: unknown) {
+    super(error instanceof Error ? error.message : String(error));
+  }
+}
+
 export class GeminiStudioAgent {
   public model: string;
+  public readonly fallbackModels: string[];
   private apiKey: string;
   public quotaManager: UserQuotaManager;
   private fetchImpl: typeof fetch;
@@ -462,6 +482,7 @@ export class GeminiStudioAgent {
     this.apiKey = apiKey ?? process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY ?? "";
     this.quotaManager = quotaManager ?? new UserQuotaManager();
     this.model = options.model ?? process.env.GEMINI_MODEL ?? "gemini-3.8-flash";
+    this.fallbackModels = options.fallbackModels ?? parseModelList(process.env.GEMINI_FALLBACK_MODELS) ?? ["gemini-3.6-flash"];
     this.fetchImpl = options.fetchImpl ?? fetch;
     this.timeoutMs = options.timeoutMs ?? 25000;
   }
@@ -487,7 +508,8 @@ export class GeminiStudioAgent {
     }
     let diagnosis = fallback;
     try {
-      diagnosis = { ...fallback, ...normalizeDiagnosis(await this.callGemini(track, videoDescriptions), fallback), source: "gemini" };
+      const { result, model } = await this.callGemini(track, videoDescriptions);
+      diagnosis = { ...fallback, ...normalizeDiagnosis(result, fallback), model, source: "gemini" };
     } catch (error) {
       await reservation.release();
       console.warn(`Gemini (${this.model}) diagnosis failed, using heuristic diagnosis:`, error instanceof Error ? error.message : error);
@@ -495,20 +517,43 @@ export class GeminiStudioAgent {
     return { diagnosis, quota: await this.quotaManager.checkQuota(userId, options.bypassQuota) };
   }
 
-  private async callGemini(track: TrackAttributes, videoDescriptions?: string[]): Promise<unknown> {
+  private async callGemini(track: TrackAttributes, videoDescriptions?: string[]): Promise<{ result: unknown; model: string }> {
+    const models = [...new Set([this.model, ...this.fallbackModels])];
+    for (let index = 0; index < models.length; index++) {
+      const model = models[index];
+      try {
+        return { result: await this.requestModel(model, track, videoDescriptions), model };
+      } catch (error) {
+        const next = models[index + 1];
+        const retryable = error instanceof GeminiNetworkError ||
+          (error instanceof GeminiHttpError && RETRYABLE_GEMINI_STATUSES.has(error.status));
+        if (!next || !retryable) throw error;
+        const reason = error instanceof Error ? error.message : String(error);
+        console.warn(`Gemini (${model}) unavailable (${reason}); trying ${next}`);
+      }
+    }
+    throw new Error("No Gemini models configured");
+  }
+
+  private async requestModel(model: string, track: TrackAttributes, videoDescriptions?: string[]): Promise<unknown> {
     const base = (process.env.GEMINI_API_BASE ?? "https://generativelanguage.googleapis.com/v1beta").replace(/\/$/, "");
-    const response = await this.fetchImpl(`${base}/models/${encodeURIComponent(this.model)}:generateContent`, {
-      method: "POST",
-      headers: { "content-type": "application/json", "x-goog-api-key": this.apiKey },
-      body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: diagnosisPrompt(track, videoDescriptions) }] }],
-        generationConfig: { responseMimeType: "application/json", responseSchema: DIAGNOSIS_SCHEMA, temperature: 0.4 }
-      }),
-      signal: AbortSignal.timeout(this.timeoutMs)
-    });
+    let response: Response;
+    try {
+      response = await this.fetchImpl(`${base}/models/${encodeURIComponent(model)}:generateContent`, {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-goog-api-key": this.apiKey },
+        body: JSON.stringify({
+          contents: [{ role: "user", parts: [{ text: diagnosisPrompt(track, videoDescriptions) }] }],
+          generationConfig: { responseMimeType: "application/json", responseSchema: DIAGNOSIS_SCHEMA, temperature: 0.4 }
+        }),
+        signal: AbortSignal.timeout(this.timeoutMs)
+      });
+    } catch (error) {
+      throw new GeminiNetworkError(error);
+    }
     if (!response.ok) {
       const detail = await response.text().catch(() => "");
-      throw new Error(`Gemini API returned HTTP ${response.status}${detail ? `: ${detail.slice(0, 200)}` : ""}`);
+      throw new GeminiHttpError(response.status, `Gemini API returned HTTP ${response.status}${detail ? `: ${detail.slice(0, 200)}` : ""}`);
     }
     const data = await response.json() as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
     const text = data.candidates?.[0]?.content?.parts?.map(p => p.text ?? "").join("").trim();

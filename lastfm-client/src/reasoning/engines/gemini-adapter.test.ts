@@ -55,6 +55,139 @@ test("successful Gemini diagnoses reserve quota atomically", async () => {
   await assert.rejects(agent.diagnose(track, [], "gemini-user"), QuotaExceededError);
 });
 
+test("an overloaded primary uses the fallback model and charges one quota slot", async () => {
+  const urls: string[] = [];
+  const fetchImpl = (async (url: string) => {
+    urls.push(url);
+    if (url.endsWith("/models/primary-x:generateContent")) return new Response("busy", { status: 503 });
+    return new Response(JSON.stringify({
+      candidates: [{ content: { parts: [{ text: JSON.stringify({}) }] } }]
+    }), { status: 200 });
+  }) as unknown as typeof fetch;
+  const agent = new GeminiStudioAgent("key", new UserQuotaManager(2), {
+    model: "primary-x",
+    fallbackModels: ["fallback-y"],
+    fetchImpl
+  });
+  const { diagnosis, quota } = await agent.diagnose(track, [], "fallback-user");
+  assert.deepEqual(urls.map(url => url.slice(url.indexOf("/models/"))), [
+    "/models/primary-x:generateContent",
+    "/models/fallback-y:generateContent"
+  ]);
+  assert.equal(diagnosis.source, "gemini");
+  assert.equal(diagnosis.model, "fallback-y");
+  assert.equal(quota.used, 1);
+});
+
+test("a non-retryable Gemini response does not use a fallback model", async () => {
+  let requests = 0;
+  const fetchImpl = (async () => {
+    requests++;
+    return new Response("bad request", { status: 400 });
+  }) as unknown as typeof fetch;
+  const agent = new GeminiStudioAgent("key", new UserQuotaManager(1), {
+    model: "primary-x",
+    fallbackModels: ["fallback-y"],
+    fetchImpl
+  });
+  const warn = console.warn;
+  console.warn = () => {};
+  try {
+    const { diagnosis, quota } = await agent.diagnose(track, [], "bad-request-user");
+    assert.equal(requests, 1);
+    assert.equal(diagnosis.source, "heuristic");
+    assert.equal(quota.used, 0);
+  } finally {
+    console.warn = warn;
+  }
+});
+
+test("retryable quota and overload responses try each configured model then fall back", async () => {
+  let requests = 0;
+  const fetchImpl = (async () => {
+    requests++;
+    return new Response("unavailable", { status: requests === 1 ? 429 : 503 });
+  }) as unknown as typeof fetch;
+  const agent = new GeminiStudioAgent("key", new UserQuotaManager(1), {
+    model: "primary-x",
+    fallbackModels: ["fallback-y"],
+    fetchImpl
+  });
+  const warn = console.warn;
+  console.warn = () => {};
+  try {
+    const { diagnosis, quota } = await agent.diagnose(track, [], "unavailable-user");
+    assert.equal(requests, 2);
+    assert.equal(diagnosis.source, "heuristic");
+    assert.equal(quota.used, 0);
+  } finally {
+    console.warn = warn;
+  }
+});
+
+test("an empty fallback list disables model retries", async () => {
+  let requests = 0;
+  const fetchImpl = (async () => {
+    requests++;
+    return new Response("unavailable", { status: 503 });
+  }) as unknown as typeof fetch;
+  const agent = new GeminiStudioAgent("key", new UserQuotaManager(1), {
+    model: "primary-x",
+    fallbackModels: [],
+    fetchImpl
+  });
+  const warn = console.warn;
+  console.warn = () => {};
+  try {
+    const { diagnosis } = await agent.diagnose(track, [], "no-fallback-user");
+    assert.equal(requests, 1);
+    assert.equal(diagnosis.source, "heuristic");
+  } finally {
+    console.warn = warn;
+  }
+});
+
+test("a network error from the primary can recover with a fallback model", async () => {
+  const urls: string[] = [];
+  const fetchImpl = (async (url: string) => {
+    urls.push(url);
+    if (url.endsWith("/models/primary-x:generateContent")) throw new TypeError("fetch failed");
+    return new Response(JSON.stringify({
+      candidates: [{ content: { parts: [{ text: JSON.stringify({}) }] } }]
+    }), { status: 200 });
+  }) as unknown as typeof fetch;
+  const agent = new GeminiStudioAgent("key", new UserQuotaManager(1), {
+    model: "primary-x",
+    fallbackModels: ["fallback-y"],
+    fetchImpl
+  });
+  const warn = console.warn;
+  console.warn = () => {};
+  try {
+    const { diagnosis } = await agent.diagnose(track, [], "network-user");
+    assert.equal(urls.length, 2);
+    assert.equal(diagnosis.source, "gemini");
+    assert.equal(diagnosis.model, "fallback-y");
+  } finally {
+    console.warn = warn;
+  }
+});
+
+test("fallback model configuration parses and restores the environment", () => {
+  const previous = process.env.GEMINI_FALLBACK_MODELS;
+  try {
+    delete process.env.GEMINI_FALLBACK_MODELS;
+    assert.deepEqual(new GeminiStudioAgent("").fallbackModels, ["gemini-3.6-flash"]);
+    process.env.GEMINI_FALLBACK_MODELS = "a, b";
+    assert.deepEqual(new GeminiStudioAgent("").fallbackModels, ["a", "b"]);
+    process.env.GEMINI_FALLBACK_MODELS = "";
+    assert.deepEqual(new GeminiStudioAgent("").fallbackModels, []);
+  } finally {
+    if (previous === undefined) delete process.env.GEMINI_FALLBACK_MODELS;
+    else process.env.GEMINI_FALLBACK_MODELS = previous;
+  }
+});
+
 test("Gemini output is requested with a schema and normalized", async () => {
   let request: { url: string; init: RequestInit } | null = null;
   const reply = {
