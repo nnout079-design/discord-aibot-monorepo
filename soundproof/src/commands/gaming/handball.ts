@@ -215,7 +215,7 @@ function formatScore(match: HandballMatch): string {
 }
 
 function formatMatch(match: HandballMatch): string {
-  const throwsLeft = `${match.players[0]}: ${match.throwsPerPlayer - match.throwsTaken[0]} left, ${match.players[1]}: ${match.throwsPerPlayer - match.throwsTaken[1]} left`;
+  const throwsLeft = `<@${match.players[0]}>: ${match.throwsPerPlayer - match.throwsTaken[0]} left, <@${match.players[1]}>: ${match.throwsPerPlayer - match.throwsTaken[1]} left`;
   if (match.status === "pending") {
     return `Handball World challenge pending.\n${formatScore(match)}\nThrows left — ${throwsLeft}\nTurn: waiting for <@${match.players[1]}> to accept\nKeeper block set: no`;
   }
