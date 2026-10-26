@@ -7,6 +7,7 @@ import { schedulePattern } from "../midi/schedule";
 import { createHit, PercussionHit, PERCUSSION_PATTERNS } from "../midi/world-percussion";
 import { enrichTrack } from "./enrich";
 import { companionHub, ControlHandler } from "./companion-hub";
+import { defaultGeminiAgent, formatQuota, QuotaExceededError } from "../reasoning/engines/gemini-adapter";
 import { EntryPlan, entryHits, notifyTargets, planEntry, songEntryEvent, SongStopEvent, TrackAttributes } from "./entry";
 
 export interface SyncSession {
@@ -164,6 +165,7 @@ export const COMPANION_SESSION = "companion";
 export const companionControl: ControlHandler = async (action, body) => {
   if (action === "stop") return { status: 200, body: { stopped: await stopEntry() } };
   if (action === "now-playing") return companionNowPlaying(body);
+  if (action === "studio-diagnose" || action === "studio-quota") return companionStudio(action, body);
 
   let request: StartRequest;
   try {
@@ -199,6 +201,22 @@ export const companionControl: ControlHandler = async (action, body) => {
   };
 };
 
+// Track for a companion request: artist + title (enriched without Last.fm if the API isn't configured) or a user's now playing.
+async function lookupTrack(request: StartRequest): Promise<{ status: number; body: object } | TrackAttributes> {
+  if (!request.username && !request.artist) return { status: 400, body: { error: "username, or artist and title, is required" } };
+  const api = createLastFmApi();
+  if (!api && !request.artist) return { status: 503, body: { error: "Last.fm API is not configured on the bot" } };
+  try {
+    return request.artist && request.title
+      ? api ? await trackInfo(api, request.artist, request.title) : await enrichTrack(null, { name: request.title, artist: request.artist, tags: [] })
+      : await nowPlaying(api!, request.username!);
+  } catch (error) {
+    return { status: 422, body: { error: error instanceof Error ? error.message : "Could not read now playing from Last.fm" } };
+  }
+}
+
+const isResult = (value: object): value is { status: number; body: object } => "status" in value && "body" in value;
+
 async function companionNowPlaying(body: unknown): Promise<{ status: number; body: object }> {
   let request: StartRequest;
   try {
@@ -206,15 +224,48 @@ async function companionNowPlaying(body: unknown): Promise<{ status: number; bod
   } catch (error) {
     return { status: 400, body: { error: (error as Error).message } };
   }
-  if (!request.username && !request.artist) return { status: 400, body: { error: "username, or artist and title, is required" } };
-  const api = createLastFmApi();
-  if (!api && !request.artist) return { status: 503, body: { error: "Last.fm API is not configured on the bot" } };
+  const track = await lookupTrack(request);
+  if (isResult(track)) return track;
+  return { status: 200, body: { track, bpm: track.bpm ?? null, lights: lightPlan(track, track.bpm ?? 120) } };
+}
+
+export interface StudioRequest {
+  userId: string;
+  videos: string[];
+  originalSound: boolean;
+}
+
+export function parseStudioRequest(body: unknown): StudioRequest {
+  const input = (body && typeof body === "object" && !Array.isArray(body) ? body : {}) as Record<string, unknown>;
+  const userId = typeof input.userId === "string" && input.userId.trim() ? input.userId.trim().slice(0, 100) : "companion";
+  if (input.videos !== undefined && !(Array.isArray(input.videos) && input.videos.every(v => typeof v === "string"))) {
+    throw new Error("videos must be an array of strings");
+  }
+  const videos = ((input.videos as string[] | undefined) ?? []).map(v => v.trim().slice(0, 300)).filter(Boolean).slice(0, 6);
+  return { userId, videos, originalSound: input.originalSound !== false };
+}
+
+async function companionStudio(action: "studio-diagnose" | "studio-quota", body: unknown): Promise<{ status: number; body: object }> {
+  let studio: StudioRequest;
+  let request: StartRequest = {};
   try {
-    const track = request.artist && request.title
-      ? api ? await trackInfo(api, request.artist, request.title) : await enrichTrack(null, { name: request.title, artist: request.artist, tags: [] })
-      : await nowPlaying(api!, request.username!);
-    return { status: 200, body: { track, bpm: track.bpm ?? null, lights: lightPlan(track, track.bpm ?? 120) } };
+    studio = parseStudioRequest(body);
+    if (action === "studio-diagnose") request = parseStartRequest(body);
   } catch (error) {
-    return { status: 422, body: { error: error instanceof Error ? error.message : "Could not read now playing from Last.fm" } };
+    return { status: 400, body: { error: (error as Error).message } };
+  }
+  const userId = `companion:${studio.userId}`;
+  if (action === "studio-quota") {
+    const quota = defaultGeminiAgent.quotaManager.checkQuota(userId);
+    return { status: 200, body: { quota, summary: formatQuota(quota) } };
+  }
+  const track = await lookupTrack(request);
+  if (isResult(track)) return track;
+  try {
+    const { diagnosis, quota } = await defaultGeminiAgent.diagnose(track, studio.videos, userId, { originalSound: studio.originalSound, videoOnly: true });
+    return { status: 200, body: { diagnosis, quota, summary: formatQuota(quota), track, bpm: track.bpm ?? null } };
+  } catch (error) {
+    if (error instanceof QuotaExceededError) return { status: 429, body: { error: error.message, quota: error.quota } };
+    throw error;
   }
 }

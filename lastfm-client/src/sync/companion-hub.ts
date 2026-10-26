@@ -10,13 +10,19 @@ export interface ControlResult {
   body: object;
 }
 
-export type ControlAction = "start" | "stop" | "now-playing";
+export type ControlAction = "start" | "stop" | "now-playing" | "studio-diagnose" | "studio-quota";
 
 export type ControlHandler = (action: ControlAction, body: unknown) => Promise<ControlResult>;
 
 const MAX_BODY_BYTES = 4096;
 
-const CONTROL_PATHS: Record<string, ControlAction> = { "/sync/start": "start", "/sync/stop": "stop", "/sync/now-playing": "now-playing" };
+const CONTROL_PATHS: Record<string, ControlAction> = {
+  "/sync/start": "start",
+  "/sync/stop": "stop",
+  "/sync/now-playing": "now-playing",
+  "/sync/studio/diagnose": "studio-diagnose",
+  "/sync/studio/quota": "studio-quota"
+};
 
 const sha256 = (value: string) => crypto.createHash("sha256").update(value).digest();
 
@@ -49,7 +55,8 @@ function writeEvent(res: http.ServerResponse, event: HubEvent): void {
 
 // Companions on users' PCs connect out to GET /sync/events (Server-Sent Events) and
 // align their clocks with GET /sync/time, so they never need a public URL of their own.
-// POST /sync/start, /sync/stop and /sync/now-playing let a companion arm, stop or look up an entry without Discord.
+// POST /sync/start, /sync/stop and /sync/now-playing let a companion arm, stop or look up an entry without Discord;
+// POST /sync/studio/diagnose and /sync/studio/quota run the studio video diagnosis for `npm run studio inflict`.
 export class CompanionHub {
   private clients = new Set<http.ServerResponse>();
   private armed: SongEntryEvent | null = null;

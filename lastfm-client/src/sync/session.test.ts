@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { companionHub } from "./companion-hub";
-import { companionControl, getSession, COMPANION_SESSION, parseStartRequest } from "./session";
+import { companionControl, getSession, COMPANION_SESSION, parseStartRequest, parseStudioRequest } from "./session";
 
 test("parseStartRequest validates pattern and ranges", () => {
   assert.deepEqual(parseStartRequest({}), { pattern: undefined, bpm: undefined, lead: undefined, beats: undefined, username: undefined });
@@ -43,4 +43,13 @@ test("companionControl arms a bar-aligned entry and stops it", async () => {
   } finally {
     console.log = log;
   }
+});
+
+test("studio quota endpoint reports per companion user and validates videos", async () => {
+  const quota = await companionControl("studio-quota", { userId: "tester" });
+  assert.equal(quota.status, 200);
+  assert.equal((quota.body as { quota: { userId: string; remaining: number } }).quota.userId, "companion:tester");
+  assert.equal((await companionControl("studio-diagnose", { artist: "a", title: "b", videos: "nope" })).status, 400);
+  assert.equal((await companionControl("studio-diagnose", {})).status, 400);
+  assert.deepEqual(parseStudioRequest({ videos: [" a.mp4 ", ""], originalSound: false }), { userId: "companion", videos: ["a.mp4"], originalSound: false });
 });

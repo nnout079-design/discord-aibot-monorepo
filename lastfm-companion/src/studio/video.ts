@@ -15,12 +15,12 @@ export interface VideoPlan {
   energy?: number;
 }
 
-const BEAM_FILE = "beam.png";
+export const BEAM_FILE = "beam.png";
 
 // Two galaxy light rigs on the stage floor, as in the companion's live show: beams a palette colour apart that
 // change colour every bar (every two bars for calmer songs), flare on each beat and sweep in mirror image.
-// Input 2 is a white beam sprite; each colour/brightness gets its own tinted copy, switched on by `enable`.
-export function galaxyBeams(plan: VideoPlan, input: string, output: string): string[] {
+// `beam` is a white beam sprite input; each colour/brightness gets its own tinted copy, switched on by `enable`.
+export function galaxyBeams(plan: Pick<VideoPlan, "bpm" | "beatsPerBar" | "palette" | "energy">, input: string, output: string, beam = "[2:v]"): string[] {
   const palette = (plan.palette?.length ? plan.palette : GALAXY_PALETTE).map(hexToRgb);
   const energy = plan.energy ?? 0.6;
   const beat = 60 / plan.bpm;
@@ -28,7 +28,7 @@ export function galaxyBeams(plan: VideoPlan, input: string, output: string): str
   const step = bar * (energy >= 0.7 ? 1 : 2);
   const sweep = (0.06 + 0.06 * energy).toFixed(3);
   const layers = [0, 1].flatMap(rig => palette.flatMap((_, i) => [true, false].map(bright => ({ rig, i, bright }))));
-  const filters = [`[2:v]format=rgba,split=${layers.length}${layers.map((_, j) => `[s${j}]`).join("")}`];
+  const filters = [`${beam}format=rgba,split=${layers.length}${layers.map((_, j) => `[s${j}]`).join("")}`];
   let last = input;
   layers.forEach(({ rig, i, bright }, j) => {
     const [r, g, b] = palette[i];
@@ -43,7 +43,7 @@ export function galaxyBeams(plan: VideoPlan, input: string, output: string): str
   return filters;
 }
 
-const FONTS = [
+export const FONTS = [
   "C:/Windows/Fonts/segoeuib.ttf",
   "C:/Windows/Fonts/arialbd.ttf",
   "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
@@ -130,19 +130,26 @@ export function videoFilter(plan: VideoPlan, font: string | null, dir: string): 
   ].join(";");
 }
 
-export function makeVideo(audioPath: string, backdrop: string | null, plan: VideoPlan, outPath: string): void {
-  const dir = path.dirname(outPath);
-  const fontSrc = FONTS.find(f => fs.existsSync(f));
-  let font: string | null = null;
-  if (fontSrc) {
-    fs.copyFileSync(fontSrc, path.join(dir, "font.ttf"));
-    font = "font.ttf";
-  }
+export function makeBeam(dir: string): void {
   run("ffmpeg", [
     "-y", "-loglevel", "error", "-f", "lavfi", "-i", "color=c=white:s=360x720",
     "-vf", "format=rgba,geq=r=255:g=255:b=255:a='255*exp(-pow((X-W/2)/(4+(H-Y)*0.1),2))*(0.2+0.8*Y/H)'",
     "-frames:v", "1", BEAM_FILE
   ], { cwd: dir });
+}
+
+// Copies the first available bold font next to the video (drawtext can't take Windows drive paths); null if none.
+export function copyFont(dir: string): string | null {
+  const fontSrc = FONTS.find(f => fs.existsSync(f));
+  if (!fontSrc) return null;
+  fs.copyFileSync(fontSrc, path.join(dir, "font.ttf"));
+  return "font.ttf";
+}
+
+export function makeVideo(audioPath: string, backdrop: string | null, plan: VideoPlan, outPath: string): void {
+  const dir = path.dirname(outPath);
+  const font = copyFont(dir);
+  makeBeam(dir);
   const filter = videoFilter(plan, font, dir);
   fs.writeFileSync(path.join(dir, "video-filter.txt"), filter);
   const bg = backdrop
