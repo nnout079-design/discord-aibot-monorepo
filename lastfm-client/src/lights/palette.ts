@@ -18,15 +18,17 @@ const MOODS: [RegExp, string[]][] = [
   [/classical|orchestral|soundtrack|choral|opera|baroque/, ["#ffd27f", "#ffffff", "#8fb8ff"]],
   [/folk|country|acoustic|celtic|world|afro|latin|reggae|bangla|balkan|bollywood/, ["#ffb347", "#3cb371", "#ff6347"]],
   [/pop/, ["#ff4fa3", "#ffe14f", "#4fd8ff"]],
-  [/rock|alternative|grunge|indie/, ["#ff3b1f", "#ff9f1a", "#3b5bff"]]
+  [/rock|alternative|grunge|indie/, ["#ff3b1f", "#ff9f1a", "#3b5bff"]],
 ];
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
 // Colours from the song's Last.fm tags, artist tags and genres; energy from danceability, or tempo when unknown.
 export function lightPlan(track: TrackAttributes | null, bpm: number): LightPlan {
-  const tags = [...(track?.tags ?? []), ...(track?.artistTags ?? []), ...(track?.genres ?? [])].map(tag => tag.toLowerCase());
-  const palette = MOODS.find(([pattern]) => tags.some(tag => pattern.test(tag)))?.[1] ?? GALAXY_PALETTE;
+  const tags = [...(track?.tags ?? []), ...(track?.artistTags ?? []), ...(track?.genres ?? [])].map((tag) =>
+    tag.toLowerCase()
+  );
+  const palette = MOODS.find(([pattern]) => tags.some((tag) => pattern.test(tag)))?.[1] ?? GALAXY_PALETTE;
   let energy = track?.danceability !== undefined ? track.danceability / 100 : (bpm - 60) / 120;
   if ((track?.acousticness ?? 0) >= 60) energy -= 0.2;
   return { palette, energy: Math.round(clamp(energy, 0.2, 1) * 100) / 100 };

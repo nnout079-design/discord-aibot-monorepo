@@ -6,11 +6,12 @@ import { FixtureConfig, fixtureChannels } from "./lights/fixtures";
 import { artnetPacket, enttecProPacket } from "./lights/output";
 import { BLACKOUT, buildShow, GALAXY_PALETTE, hexToRgb, rigFrame, RigState } from "./lights/show";
 
-const show = (accents: number[] = []) => buildShow(
-  { beatMs: 500, beatsPerBar: 4, lights: { palette: ["#ff0000", "#00ff00", "#0000ff"], energy: 0.8 } },
-  { countInAt: 10_000, startAt: 12_000, endAt: 30_000 },
-  accents
-);
+const show = (accents: number[] = []) =>
+  buildShow(
+    { beatMs: 500, beatsPerBar: 4, lights: { palette: ["#ff0000", "#00ff00", "#0000ff"], energy: 0.8 } },
+    { countInAt: 10_000, startAt: 12_000, endAt: 30_000 },
+    accents
+  );
 
 test("rigFrame idles before the count-in, flashes white on count-in beats and blacks out at the end", () => {
   const s = show();
@@ -39,9 +40,12 @@ test("rigFrame plays the two rigs a colour apart, mirrored, pulsing on the beat"
 
 test("rigFrame strobes white for a beat when a section comes in", () => {
   const s = show([16_000]);
-  const frames = [16_000, 16_050, 16_100, 16_150].map(t => rigFrame(s, 0, t));
-  assert.ok(frames.every(f => f.w === 1));
-  assert.deepEqual(frames.map(f => f.dimmer), [1, 0, 1, 0]);
+  const frames = [16_000, 16_050, 16_100, 16_150].map((t) => rigFrame(s, 0, t));
+  assert.ok(frames.every((f) => f.w === 1));
+  assert.deepEqual(
+    frames.map((f) => f.dimmer),
+    [1, 0, 1, 0]
+  );
   assert.equal(rigFrame(s, 0, 16_600).w, 0);
 });
 
@@ -52,11 +56,23 @@ test("buildShow falls back to the galaxy palette", () => {
 });
 
 const red: RigState = { r: 1, g: 0, b: 0, w: 0, dimmer: 1, pan: 0.5, tilt: 0.25 };
-const fixture = (profile: FixtureConfig["profile"], extra: Partial<FixtureConfig> = {}): FixtureConfig => ({ name: "x", profile, address: 1, rig: 0, ...extra });
+const fixture = (profile: FixtureConfig["profile"], extra: Partial<FixtureConfig> = {}): FixtureConfig => ({
+  name: "x",
+  profile,
+  address: 1,
+  rig: 0,
+  ...extra,
+});
 
 test("Showtec Galaxy 360 channel maps", () => {
-  assert.deepEqual(fixtureChannels(fixture("showtec-galaxy-360-18ch"), red), [128, 0, 64, 0, 0, 0, 0, 255, 0, 0, 0, 0, 0, 0, 255, 0, 0, 0]);
-  const ten = fixtureChannels(fixture("showtec-galaxy-360-10ch", { invertPan: true, tiltRange: [0, 0.5] }), { ...red, pan: 0 });
+  assert.deepEqual(
+    fixtureChannels(fixture("showtec-galaxy-360-18ch"), red),
+    [128, 0, 64, 0, 0, 0, 0, 255, 0, 0, 0, 0, 0, 0, 255, 0, 0, 0]
+  );
+  const ten = fixtureChannels(fixture("showtec-galaxy-360-10ch", { invertPan: true, tiltRange: [0, 0.5] }), {
+    ...red,
+    pan: 0,
+  });
   assert.deepEqual(ten, [255, 32, 0, 0, 255, 0, 10, 0, 0, 0]);
   assert.equal(fixtureChannels(fixture("showtec-galaxy-360-10ch"), { ...red, r: 0, b: 1 })[6], 143, "blue preset");
 });
@@ -82,7 +98,14 @@ test("renderUniverse places each fixture at its address and blacks out without a
 
 test("validateLights catches overlaps and out-of-range addresses", () => {
   assert.deepEqual(validateLights(DEFAULT_LIGHTS), []);
-  const bad = validateLights({ ...DEFAULT_LIGHTS, fixtures: [fixture("rgbw-dimmer", { name: "A" }), fixture("rgb", { name: "B", address: 3 }), fixture("rgb", { name: "C", address: 511 })] });
+  const bad = validateLights({
+    ...DEFAULT_LIGHTS,
+    fixtures: [
+      fixture("rgbw-dimmer", { name: "A" }),
+      fixture("rgb", { name: "B", address: 3 }),
+      fixture("rgb", { name: "C", address: 511 }),
+    ],
+  });
   assert.deepEqual(bad, ["B overlaps A at channel 3", "C: address 511 + 3 channels does not fit in 1-512"]);
 });
 

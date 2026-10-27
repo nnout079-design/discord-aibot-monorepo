@@ -9,10 +9,11 @@ const AUDIO_EXT = /\.(mp3|wav|flac|ogg|m4a)$/i;
 const STEMS = [
   { stem: "bass", name: "bass", program: 33 },
   { stem: "vocals", name: "vocals", program: 73 },
-  { stem: "other", name: "other", program: 0 }
+  { stem: "other", name: "other", program: 0 },
 ];
 
-const pythonCommand = (): string[] => (process.env.PYTHON ?? (process.platform === "win32" ? "py -3.10" : "python3")).split(" ");
+const pythonCommand = (): string[] =>
+  (process.env.PYTHON ?? (process.platform === "win32" ? "py -3.10" : "python3")).split(" ");
 
 function python(args: string[], label: string): void {
   const [cmd, ...pre] = pythonCommand();
@@ -49,15 +50,26 @@ function transcribe(file: string, outDir: string): string {
     python(["-m", "demucs", "-n", "htdemucs", "-o", work, file], "Demucs");
     const stemDir = path.join(work, "htdemucs", name);
     console.log("[2/3] Transcribing bass, vocals and other (Basic Pitch) ...");
-    const stems = STEMS.map(s => path.join(stemDir, `${s.stem}.wav`)).filter(p => fs.existsSync(p));
-    python(["-c", "import sys; from basic_pitch.predict import main; sys.argv = ['basic-pitch'] + sys.argv[1:]; main()", work, ...stems], "Basic Pitch");
+    const stems = STEMS.map((s) => path.join(stemDir, `${s.stem}.wav`)).filter((p) => fs.existsSync(p));
+    python(
+      [
+        "-c",
+        "import sys; from basic_pitch.predict import main; sys.argv = ['basic-pitch'] + sys.argv[1:]; main()",
+        work,
+        ...stems,
+      ],
+      "Basic Pitch"
+    );
 
     console.log("[3/3] Merging into one MIDI file ...");
-    const tracks = STEMS.map(s => {
+    const tracks = STEMS.map((s) => {
       const mid = path.join(work, `${s.stem}_basic_pitch.mid`);
-      return { ...s, notes: fs.existsSync(mid) ? parseMidi(fs.readFileSync(mid)).parts.flatMap(p => p.notes) : [] as PartNote[] };
+      return {
+        ...s,
+        notes: fs.existsSync(mid) ? parseMidi(fs.readFileSync(mid)).parts.flatMap((p) => p.notes) : ([] as PartNote[]),
+      };
     });
-    const bpm = estimateBpm(tracks.flatMap(t => t.notes.map(n => n.timeMs)));
+    const bpm = estimateBpm(tracks.flatMap((t) => t.notes.map((n) => n.timeMs)));
     const midi = new Midi();
     midi.header.setTempo(bpm);
     midi.header.name = name;
@@ -66,11 +78,18 @@ function transcribe(file: string, outDir: string): string {
       track.name = t.name;
       track.channel = i;
       track.instrument.number = t.program;
-      t.notes.forEach(n => track.addNote({ midi: n.note, velocity: n.velocity / 127, time: n.timeMs / 1000, duration: n.durationMs / 1000 }));
+      t.notes.forEach((n) =>
+        track.addNote({
+          midi: n.note,
+          velocity: n.velocity / 127,
+          time: n.timeMs / 1000,
+          duration: n.durationMs / 1000,
+        })
+      );
     });
     const out = path.join(outDir, `${name}.mid`);
     fs.writeFileSync(out, midi.toArray());
-    console.log(`Wrote ${out} (${bpm} BPM, ${tracks.map(t => `${t.name} ${t.notes.length}`).join(", ")} notes)`);
+    console.log(`Wrote ${out} (${bpm} BPM, ${tracks.map((t) => `${t.name} ${t.notes.length}`).join(", ")} notes)`);
     return out;
   } finally {
     fs.rmSync(work, { recursive: true, force: true });
@@ -80,14 +99,21 @@ function transcribe(file: string, outDir: string): string {
 // `npm run transcribe "C:\Music\Artist - Title.mp3"` (or a folder of audio files) writes songs/transcribed/Artist - Title.mid.
 function main(): void {
   const inputs = process.argv.slice(2);
-  if (inputs.length === 0) throw new Error('Usage: npm run transcribe "C:\\Music\\Artist - Title.mp3" (files or folders)');
+  if (inputs.length === 0)
+    throw new Error('Usage: npm run transcribe "C:\\Music\\Artist - Title.mp3" (files or folders)');
   const outDir = path.join(process.env.SONGS_DIR ?? "songs", "transcribed");
   fs.mkdirSync(outDir, { recursive: true });
-  const files = inputs.flatMap(input =>
-    fs.statSync(input).isDirectory() ? fs.readdirSync(input).filter(f => AUDIO_EXT.test(f)).map(f => path.join(input, f)) : [input]
+  const files = inputs.flatMap((input) =>
+    fs.statSync(input).isDirectory()
+      ? fs
+          .readdirSync(input)
+          .filter((f) => AUDIO_EXT.test(f))
+          .map((f) => path.join(input, f))
+      : [input]
   );
   for (const file of files) {
-    if (!path.basename(file).includes(" - ")) console.log(`Note: name ${path.basename(file)} as "Artist - Title" so it matches Last.fm.`);
+    if (!path.basename(file).includes(" - "))
+      console.log(`Note: name ${path.basename(file)} as "Artist - Title" so it matches Last.fm.`);
     transcribe(path.resolve(file), outDir);
   }
 }

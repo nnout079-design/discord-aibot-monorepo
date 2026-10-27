@@ -74,9 +74,9 @@ export function entryHits(plan: EntryPlan, pattern: ScheduledHit[] = []): Schedu
     note: COUNT_IN_NOTE,
     velocity: i === 0 ? 110 : 90,
     durationMs: clickMs,
-    offsetMs: i * plan.beatMs
+    offsetMs: i * plan.beatMs,
   }));
-  return [...clicks, ...pattern.map(hit => ({ ...hit, offsetMs: plan.barMs + hit.offsetMs }))];
+  return [...clicks, ...pattern.map((hit) => ({ ...hit, offsetMs: plan.barMs + hit.offsetMs }))];
 }
 
 export function songEntryEvent(
@@ -90,22 +90,30 @@ export function songEntryEvent(
   return { type: "song-entry", sentAt, ...plan, pattern, track, ...(midi && { midi }), ...(lights && { lights }) };
 }
 
-export async function notifyTargets(event: SongEntryEvent | SongStopEvent, targets = process.env.SYNC_TARGETS ?? ""): Promise<void> {
-  const urls = targets.split(",").map(url => url.trim()).filter(Boolean);
+export async function notifyTargets(
+  event: SongEntryEvent | SongStopEvent,
+  targets = process.env.SYNC_TARGETS ?? ""
+): Promise<void> {
+  const urls = targets
+    .split(",")
+    .map((url) => url.trim())
+    .filter(Boolean);
   if (urls.length === 0) {
     console.log("Sync event", JSON.stringify(event));
     return;
   }
-  const results = await Promise.allSettled(urls.map(async url => {
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(event),
-      signal: AbortSignal.timeout(2000)
-    });
-    if (!response.ok) throw new Error(`${url} returned ${response.status}`);
-  }));
-  results.forEach(result => {
+  const results = await Promise.allSettled(
+    urls.map(async (url) => {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(event),
+        signal: AbortSignal.timeout(2000),
+      });
+      if (!response.ok) throw new Error(`${url} returned ${response.status}`);
+    })
+  );
+  results.forEach((result) => {
     if (result.status === "rejected") console.error("Sync target failed:", result.reason);
   });
 }

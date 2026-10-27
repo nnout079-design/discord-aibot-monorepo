@@ -19,7 +19,7 @@ export async function triggerMidi(hit: PercussionHit, channel = 9): Promise<Midi
     velocity: hit.velocity,
     durationMs: hit.durationMs,
     instrument: hit.instrument,
-    requestedAt: new Date().toISOString()
+    requestedAt: new Date().toISOString(),
   };
   const bridgeUrl = process.env.MIDI_BRIDGE_URL;
   if (bridgeUrl) {
@@ -27,7 +27,7 @@ export async function triggerMidi(hit: PercussionHit, channel = 9): Promise<Midi
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(trigger),
-      signal: AbortSignal.timeout(2000)
+      signal: AbortSignal.timeout(2000),
     });
     if (!response.ok) throw new Error(`MIDI bridge returned ${response.status}`);
   } else {
@@ -58,21 +58,41 @@ export async function triggerBatch(batch: Batch, channel = 9, timing: BatchTimin
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ bpm: batch.bpm, stepMs: batch.stepMs, channel: ch, leadMs, startAt, hits: batch.hits }),
-      signal: AbortSignal.timeout(2000)
+      signal: AbortSignal.timeout(2000),
     });
     if (!res.ok) throw new Error(`MIDI bridge /batch returned ${res.status}`);
-    signal?.addEventListener("abort", () => {
-      fetch(`${url.replace(/\/$/, "")}/stop`, { method: "POST", signal: AbortSignal.timeout(2000) })
-        .catch(error => console.error("MIDI bridge /stop failed:", error));
-    }, { once: true });
+    signal?.addEventListener(
+      "abort",
+      () => {
+        fetch(`${url.replace(/\/$/, "")}/stop`, { method: "POST", signal: AbortSignal.timeout(2000) }).catch((error) =>
+          console.error("MIDI bridge /stop failed:", error)
+        );
+      },
+      { once: true }
+    );
     return;
   }
 
   console.warn("MIDI_BRIDGE_BATCH not set: setTimeout fallback, sub-ms swing is lost");
   const baseMs = startAt === undefined ? 0 : startAt - Date.now();
-  await Promise.all(batch.hits.map(hit => new Promise<void>((resolve, reject) => {
-    if (signal?.aborted) return resolve();
-    const timer = setTimeout(() => triggerMidi(hit, ch).then(() => resolve(), reject), Math.max(0, baseMs + hit.offsetMs));
-    signal?.addEventListener("abort", () => { clearTimeout(timer); resolve(); }, { once: true });
-  })));
+  await Promise.all(
+    batch.hits.map(
+      (hit) =>
+        new Promise<void>((resolve, reject) => {
+          if (signal?.aborted) return resolve();
+          const timer = setTimeout(
+            () => triggerMidi(hit, ch).then(() => resolve(), reject),
+            Math.max(0, baseMs + hit.offsetMs)
+          );
+          signal?.addEventListener(
+            "abort",
+            () => {
+              clearTimeout(timer);
+              resolve();
+            },
+            { once: true }
+          );
+        })
+    )
+  );
 }

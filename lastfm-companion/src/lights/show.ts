@@ -44,7 +44,9 @@ export function buildShow(
   local: { countInAt: number; startAt: number; endAt: number | null },
   accents: number[] = []
 ): LightShow {
-  const plan = event.lights?.palette.length ? event.lights : { palette: GALAXY_PALETTE, energy: event.lights?.energy ?? 0.6 };
+  const plan = event.lights?.palette.length
+    ? event.lights
+    : { palette: GALAXY_PALETTE, energy: event.lights?.energy ?? 0.6 };
   return {
     palette: plan.palette.map(hexToRgb),
     energy: Math.min(1, Math.max(0, plan.energy)),
@@ -53,7 +55,7 @@ export function buildShow(
     countInAt: local.countInAt,
     startAt: local.startAt,
     endAt: local.endAt,
-    accents
+    accents,
   };
 }
 
@@ -83,12 +85,15 @@ export function rigFrame(show: LightShow, rig: number, now: number): RigState {
   const kick = (beat % beatsPerBar === 0 ? 1 : 0.6) * Math.exp(-phase * 5);
   const side = rig % 2 === 0 ? 1 : -1;
   const state: RigState = {
-    r, g, b, w: 0,
+    r,
+    g,
+    b,
+    w: 0,
     dimmer: base + (1 - base) * kick,
     pan: 0.5 + side * (0.15 + 0.15 * energy) * Math.sin((Math.PI * bars) / 2),
-    tilt: 0.5 + 0.15 * Math.sin((Math.PI * bars) / 4 + rig * Math.PI / 2)
+    tilt: 0.5 + 0.15 * Math.sin((Math.PI * bars) / 4 + (rig * Math.PI) / 2),
   };
-  if (show.accents.some(at => now >= at && now < at + ACCENT_BEATS * beatMs)) {
+  if (show.accents.some((at) => now >= at && now < at + ACCENT_BEATS * beatMs)) {
     state.w = 1;
     state.dimmer = Math.floor(now / STROBE_MS) % 2 === 0 ? 1 : 0;
   }

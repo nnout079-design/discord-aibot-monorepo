@@ -13,7 +13,9 @@ async function main(): Promise<void> {
   const dir = path.join(process.env.SONGS_DIR ?? "songs", "lakh");
   fs.mkdirSync(dir, { recursive: true });
   if (fs.existsSync(path.join(dir, "clean_midi"))) {
-    console.log(`${dir}${path.sep}clean_midi already exists (${indexLibrary(path.dirname(dir)).filter(e => e.source === "lakh").length} songs).`);
+    console.log(
+      `${dir}${path.sep}clean_midi already exists (${indexLibrary(path.dirname(dir)).filter((e) => e.source === "lakh").length} songs).`
+    );
     return;
   }
   const archive = path.join(dir, "clean_midi.tar.gz");
@@ -35,10 +37,10 @@ async function main(): Promise<void> {
   const tar = spawnSync("tar", ["-xzf", "clean_midi.tar.gz"], { cwd: dir, stdio: "inherit" });
   if (tar.status !== 0) throw new Error("tar failed; extract songs/lakh/clean_midi.tar.gz with 7-Zip into songs/lakh");
   fs.rmSync(archive);
-  console.log(`Done: ${indexLibrary(path.dirname(dir)).filter(e => e.source === "lakh").length} songs in ${dir}`);
+  console.log(`Done: ${indexLibrary(path.dirname(dir)).filter((e) => e.source === "lakh").length} songs in ${dir}`);
 }
 
-main().catch(error => {
+main().catch((error) => {
   console.error(error instanceof Error ? error.message : error);
   process.exit(1);
 });

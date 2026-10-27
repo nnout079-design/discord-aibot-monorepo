@@ -89,7 +89,10 @@ export class Player {
   private djLoaded = false;
   private router: Router;
 
-  constructor(out: MidiOut | Router, private options: { clock: boolean; now?: () => number; panicAll?: boolean }) {
+  constructor(
+    out: MidiOut | Router,
+    private options: { clock: boolean; now?: () => number; panicAll?: boolean }
+  ) {
     this.router = "send" in out ? singleRouter(out) : out;
   }
 
@@ -147,14 +150,19 @@ export class Player {
       programs.set(target.out, channels);
     }
     for (const [out, channels] of programs) {
-      for (const [channel, program] of channels) this.push(countInAt - PROGRAM_LEAD_MS, out, [PROGRAM | channel, program]);
+      for (const [channel, program] of channels)
+        this.push(countInAt - PROGRAM_LEAD_MS, out, [PROGRAM | channel, program]);
     }
     for (const note of score.notes) {
       const target = this.router.section(note.section);
       if (!target) continue;
       const at = startAt + note.timeMs - target.latencyMs;
       const pitch = target.drums ? note.note : moveIntoRange(note.note, target.range);
-      this.push(at, target.out, [NOTE_ON | target.channel, pitch, Math.max(1, Math.min(127, Math.round(note.velocity)))]);
+      this.push(at, target.out, [
+        NOTE_ON | target.channel,
+        pitch,
+        Math.max(1, Math.min(127, Math.round(note.velocity))),
+      ]);
       this.push(at + Math.max(10, note.durationMs), target.out, [NOTE_OFF | target.channel, pitch, 0]);
     }
   }

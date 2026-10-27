@@ -14,18 +14,13 @@ function getMentalHealthClient(): MentalHealthClient | undefined {
 export const data = new SlashCommandBuilder()
   .setName("reason")
   .setDescription("Ask Claude a complex question")
-  .addStringOption(option =>
-    option
-      .setName("question")
-      .setDescription("Your question for Claude")
-      .setRequired(true)
-  );
+  .addStringOption((option) => option.setName("question").setDescription("Your question for Claude").setRequired(true));
 
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
   if (!isCoworker(interaction.user)) {
     await interaction.reply({
       content: "This assistant is available to approved coworkers only.",
-      ephemeral: true
+      ephemeral: true,
     });
     return;
   }
@@ -50,11 +45,19 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
           title: "Mental Health Support",
           color: 0xe74c3c,
           fields: [
-            { name: "Detected risk level", value: `${screening.crisis.severity} (${(screening.crisis.confidence * 100).toFixed(1)}%)` },
-            { name: "Support resources", value: screening.triage?.suggested_resources.join("\n") || "Please contact local emergency services or a mental health professional." },
+            {
+              name: "Detected risk level",
+              value: `${screening.crisis.severity} (${(screening.crisis.confidence * 100).toFixed(1)}%)`,
+            },
+            {
+              name: "Support resources",
+              value:
+                screening.triage?.suggested_resources.join("\n") ||
+                "Please contact local emergency services or a mental health professional.",
+            },
             { name: "Note", value: screening.disclaimer },
           ],
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
         };
         await interaction.editReply({ embeds: [embed] });
         return;
@@ -66,30 +69,30 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       {
         name: "Question",
         value: question.substring(0, 1024),
-        inline: false
+        inline: false,
       },
       {
         name: "Answer",
         value: result.answer.substring(0, 1024),
-        inline: false
+        inline: false,
       },
       {
         name: "Type",
         value: result.type,
-        inline: true
+        inline: true,
       },
       {
         name: "Confidence",
         value: `${(result.confidence * 100).toFixed(0)}%`,
-        inline: true
-      }
+        inline: true,
+      },
     ];
 
     if (result.details?.reasoning) {
       fields.push({
         name: "Reasoning",
         value: String(result.details.reasoning).substring(0, 1024),
-        inline: false
+        inline: false,
       });
     }
 
@@ -99,9 +102,9 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
           color: result.verified ? 0x00ff00 : 0xffff00,
           title: "Claude Analysis",
           fields,
-          timestamp: new Date().toISOString()
-        }
-      ]
+          timestamp: new Date().toISOString(),
+        },
+      ],
     });
   } catch (error) {
     console.error("Ask command error:", error);

@@ -8,19 +8,41 @@ import { armEntry, getSession, nowPlaying, stopEntry, SyncSession } from "../syn
 export const data = new SlashCommandBuilder()
   .setName("sync")
   .setDescription("Timed song entry: count-in, MIDI and cue targets locked to one start timestamp")
-  .addSubcommand(command => command
-    .setName("start")
-    .setDescription("Arm a synced song entry on the next bar line")
-    .addStringOption(option => option.setName("username").setDescription("Last.fm username to pull now-playing track attributes from"))
-    .addIntegerOption(option => option.setName("lead").setDescription("Seconds until the count-in (default 8)").setMinValue(2).setMaxValue(60))
-    .addNumberOption(option => option.setName("bpm").setDescription("Tempo for count-in and pattern (default ~137.5)").setMinValue(40).setMaxValue(240))
-    .addIntegerOption(option => option.setName("beats").setDescription("Beats per bar / count-in length (default 4)").setMinValue(2).setMaxValue(12))
-    .addStringOption(option => option
-      .setName("pattern")
-      .setDescription("Percussion pattern to enter on the downbeat")
-      .addChoices(...Object.keys(PERCUSSION_PATTERNS).map(name => ({ name, value: name })))))
-  .addSubcommand(command => command.setName("stop").setDescription("Cancel the armed song entry or stop the one playing"))
-  .addSubcommand(command => command.setName("status").setDescription("Show the armed song entry"));
+  .addSubcommand((command) =>
+    command
+      .setName("start")
+      .setDescription("Arm a synced song entry on the next bar line")
+      .addStringOption((option) =>
+        option.setName("username").setDescription("Last.fm username to pull now-playing track attributes from")
+      )
+      .addIntegerOption((option) =>
+        option.setName("lead").setDescription("Seconds until the count-in (default 8)").setMinValue(2).setMaxValue(60)
+      )
+      .addNumberOption((option) =>
+        option
+          .setName("bpm")
+          .setDescription("Tempo for count-in and pattern (default ~137.5)")
+          .setMinValue(40)
+          .setMaxValue(240)
+      )
+      .addIntegerOption((option) =>
+        option
+          .setName("beats")
+          .setDescription("Beats per bar / count-in length (default 4)")
+          .setMinValue(2)
+          .setMaxValue(12)
+      )
+      .addStringOption((option) =>
+        option
+          .setName("pattern")
+          .setDescription("Percussion pattern to enter on the downbeat")
+          .addChoices(...Object.keys(PERCUSSION_PATTERNS).map((name) => ({ name, value: name })))
+      )
+  )
+  .addSubcommand((command) =>
+    command.setName("stop").setDescription("Cancel the armed song entry or stop the one playing")
+  )
+  .addSubcommand((command) => command.setName("status").setDescription("Show the armed song entry"));
 
 const unix = (ms: number) => Math.floor(ms / 1000);
 
@@ -66,8 +88,10 @@ async function handleStart(interaction: ChatInputCommandInteraction, guildId: st
     pattern: interaction.options.getString("pattern"),
     track,
     onDownbeat: () => {
-      interaction.followUp(`Downbeat: ${track ? `${track.artist} - ${track.name}` : "song entry"} now.`).catch(() => {});
-    }
+      interaction
+        .followUp(`Downbeat: ${track ? `${track.artist} - ${track.name}` : "song entry"} now.`)
+        .catch(() => {});
+    },
   });
   await interaction.editReply({ embeds: [describe(session)] });
 }

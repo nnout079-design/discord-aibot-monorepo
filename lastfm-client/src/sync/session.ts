@@ -7,7 +7,15 @@ import { schedulePattern } from "../midi/schedule";
 import { createHit, PercussionHit, PERCUSSION_PATTERNS } from "../midi/world-percussion";
 import { enrichTrack } from "./enrich";
 import { companionHub, ControlHandler } from "./companion-hub";
-import { EntryPlan, entryHits, notifyTargets, planEntry, songEntryEvent, SongStopEvent, TrackAttributes } from "./entry";
+import {
+  EntryPlan,
+  entryHits,
+  notifyTargets,
+  planEntry,
+  songEntryEvent,
+  SongStopEvent,
+  TrackAttributes,
+} from "./entry";
 
 export interface SyncSession {
   plan: EntryPlan;
@@ -32,7 +40,8 @@ if (projectors) console.log("Galaxy projectors: Tuya cloud control on");
 
 export async function nowPlaying(api: LastFmApi, username: string): Promise<TrackAttributes> {
   const [track] = await api.getRecentTracks(username, 1);
-  if (!track || track["@attr"]?.nowplaying !== "true") throw new Error(`${username} is not scrobbling anything right now`);
+  if (!track || track["@attr"]?.nowplaying !== "true")
+    throw new Error(`${username} is not scrobbling anything right now`);
   const base = await trackInfo(api, track.artist["#text"], track.name, false);
   return enrichTrack(api, { ...base, album: track.album?.["#text"] || base.album, url: track.url });
 }
@@ -50,7 +59,7 @@ export async function trackInfo(api: LastFmApi, artist: string, name: string, en
     imageUrl: info?.imageUrl,
     summary: info?.summary,
     listeners: info?.listeners || undefined,
-    playcount: info?.playcount || undefined
+    playcount: info?.playcount || undefined,
   };
   return enrich ? enrichTrack(api, track) : track;
 }
@@ -88,7 +97,13 @@ export async function armEntry(key: string, options: EntryOptions = {}): Promise
   const plan = planEntry(Date.now(), options.leadMs ?? 8000, bpm, options.beatsPerBar ?? track?.timeSig ?? 4);
   const pattern = options.pattern ?? null;
   const patternHits = pattern
-    ? schedulePattern(PERCUSSION_PATTERNS[pattern].map(id => createHit(id)).filter((hit): hit is PercussionHit => hit !== undefined), seed, bpm).hits
+    ? schedulePattern(
+        PERCUSSION_PATTERNS[pattern]
+          .map((id) => createHit(id))
+          .filter((hit): hit is PercussionHit => hit !== undefined),
+        seed,
+        bpm
+      ).hits
     : [];
 
   const abort = new AbortController();
@@ -97,16 +112,21 @@ export async function armEntry(key: string, options: EntryOptions = {}): Promise
     pattern,
     track,
     abort,
-    timer: setTimeout(() => {
-      sessions.delete(key);
-      options.onDownbeat?.(session);
-    }, Math.max(0, plan.startAt - Date.now()))
+    timer: setTimeout(
+      () => {
+        sessions.delete(key);
+        options.onDownbeat?.(session);
+      },
+      Math.max(0, plan.startAt - Date.now())
+    ),
   };
   sessions.set(key, session);
 
   const hits = entryHits(plan, patternHits);
-  triggerBatch({ bpm, stepMs: stepSeconds(bpm) * 1000, hits }, 9, { startAt: plan.countInAt, signal: abort.signal })
-    .catch(error => console.error("Sync MIDI batch failed:", error));
+  triggerBatch({ bpm, stepMs: stepSeconds(bpm) * 1000, hits }, 9, {
+    startAt: plan.countInAt,
+    signal: abort.signal,
+  }).catch((error) => console.error("Sync MIDI batch failed:", error));
   const lights = lightPlan(track, bpm);
   projectors?.play(plan, lights, track?.durationMs);
   const event = songEntryEvent(plan, pattern, track, Date.now(), { channel: 9, hits }, lights);
@@ -142,9 +162,10 @@ export function parseStartRequest(body: unknown): StartRequest {
     throw new Error(`pattern must be one of: ${Object.keys(PERCUSSION_PATTERNS).join(", ")}`);
   }
   for (const [name, value] of Object.entries({ username, artist: input.artist, title: input.title })) {
-    if (value !== undefined && value !== null && (typeof value !== "string" || value.length > 200)) throw new Error(`${name} must be a string`);
+    if (value !== undefined && value !== null && (typeof value !== "string" || value.length > 200))
+      throw new Error(`${name} must be a string`);
   }
-  const text = (value: unknown) => typeof value === "string" && value.trim() ? value.trim() : undefined;
+  const text = (value: unknown) => (typeof value === "string" && value.trim() ? value.trim() : undefined);
   const artist = text(input.artist);
   const title = text(input.title);
   if (Boolean(artist) !== Boolean(title)) throw new Error("artist and title must be given together");
@@ -154,7 +175,7 @@ export function parseStartRequest(body: unknown): StartRequest {
     lead: inRange(input.lead, "lead", 2, 60),
     beats: inRange(input.beats, "beats", 2, 12),
     username: text(username),
-    ...(artist && title ? { artist, title } : {})
+    ...(artist && title ? { artist, title } : {}),
   };
 }
 
@@ -183,7 +204,10 @@ export const companionControl: ControlHandler = async (action, body) => {
     try {
       track = await nowPlaying(api, request.username);
     } catch (error) {
-      return { status: 422, body: { error: error instanceof Error ? error.message : "Could not read now playing from Last.fm" } };
+      return {
+        status: 422,
+        body: { error: error instanceof Error ? error.message : "Could not read now playing from Last.fm" },
+      };
     }
   }
   const { plan, pattern } = await armEntry(COMPANION_SESSION, {
@@ -191,11 +215,20 @@ export const companionControl: ControlHandler = async (action, body) => {
     leadMs: request.lead === undefined ? undefined : request.lead * 1000,
     beatsPerBar: request.beats === undefined ? undefined : Math.round(request.beats),
     pattern: request.pattern,
-    track
+    track,
   });
   return {
     status: 200,
-    body: { countInAt: plan.countInAt, startAt: plan.startAt, bpm: plan.bpm, beatsPerBar: plan.beatsPerBar, pattern, track, companions: companionHub.connected, now: Date.now() }
+    body: {
+      countInAt: plan.countInAt,
+      startAt: plan.startAt,
+      bpm: plan.bpm,
+      beatsPerBar: plan.beatsPerBar,
+      pattern,
+      track,
+      companions: companionHub.connected,
+      now: Date.now(),
+    },
   };
 };
 
@@ -206,15 +239,22 @@ async function companionNowPlaying(body: unknown): Promise<{ status: number; bod
   } catch (error) {
     return { status: 400, body: { error: (error as Error).message } };
   }
-  if (!request.username && !request.artist) return { status: 400, body: { error: "username, or artist and title, is required" } };
+  if (!request.username && !request.artist)
+    return { status: 400, body: { error: "username, or artist and title, is required" } };
   const api = createLastFmApi();
   if (!api && !request.artist) return { status: 503, body: { error: "Last.fm API is not configured on the bot" } };
   try {
-    const track = request.artist && request.title
-      ? api ? await trackInfo(api, request.artist, request.title) : await enrichTrack(null, { name: request.title, artist: request.artist, tags: [] })
-      : await nowPlaying(api!, request.username!);
+    const track =
+      request.artist && request.title
+        ? api
+          ? await trackInfo(api, request.artist, request.title)
+          : await enrichTrack(null, { name: request.title, artist: request.artist, tags: [] })
+        : await nowPlaying(api!, request.username!);
     return { status: 200, body: { track, bpm: track.bpm ?? null, lights: lightPlan(track, track.bpm ?? 120) } };
   } catch (error) {
-    return { status: 422, body: { error: error instanceof Error ? error.message : "Could not read now playing from Last.fm" } };
+    return {
+      status: 422,
+      body: { error: error instanceof Error ? error.message : "Could not read now playing from Last.fm" },
+    };
   }
 }

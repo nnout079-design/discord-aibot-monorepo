@@ -3,6 +3,8 @@ import { getEpicGameLink, epicConfigurationStatus } from "../../gaming/epic";
 import { getGameState, updateGameState } from "../../gaming/game-state";
 import { listRules } from "../../gaming/rules";
 import { fetchStarCitizenTelemetry } from "../../gaming/star-citizen";
+import { analyzeDeath, getDiagnosticSummary, requestReaInvestigation } from "../../gaming/diagnostics";
+import { getPushbulletStatus, sendPushbulletNote } from "../../notifications/pushbullet";
 import { isCoworker } from "../../security/coworkers";
 
 export const data = new SlashCommandBuilder()
@@ -14,6 +16,11 @@ export const data = new SlashCommandBuilder()
     .addStringOption(option => option.setName("game").setDescription("Epic app slug or game identifier").setRequired(true)))
   .addSubcommand(command => command.setName("status").setDescription("Show the current game telemetry state"))
   .addSubcommand(command => command.setName("rules").setDescription("List active game reaction rules"))
+  .addSubcommand(command => command.setName("diagnostics").setDescription("Summarize streaming, AI, telemetry, and bot failures"))
+  .addSubcommand(command => command.setName("postmortem").setDescription("Analyze the latest death and prepare a safer next attempt"))
+  .addSubcommand(command => command.setName("notifications").setDescription("Check the Pushbullet notification connection"))
+  .addSubcommand(command => command.setName("push-test").setDescription("Send a Pushbullet test notification"))
+  .addSubcommand(command => command.setName("rea-review").setDescription("Submit redacted diagnostics to configured REA providers"))
   .addSubcommand(command => command.setName("star-citizen").setDescription("Fetch Star Citizen API telemetry"));
 
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
@@ -33,6 +40,63 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
   if (action === "rules") {
     const summary = listRules().map(rule => `• ${rule.id}: ${rule.response}`).join("\n");
     await interaction.reply({ content: summary, ephemeral: true });
+    return;
+  }
+
+  if (action === "notifications" || action === "push-test") {
+    await interaction.deferReply({ ephemeral: true });
+    if (action === "push-test") {
+      const result = await sendPushbulletNote({ title: "Soundproof gaming companion", body: "Pushbullet notifications are connected." });
+      await interaction.editReply({ content: `Pushbullet test: ${result.status}.` });
+      return;
+    }
+    const status = await getPushbulletStatus();
+    await interaction.editReply({ content: status.connected ? `Pushbullet connected${status.account ? ` for ${status.account}` : ""}.` : `Pushbullet unavailable: ${status.error ?? "not configured"}.` });
+    return;
+  }
+
+  if (action === "postmortem") {
+    if (!interaction.guildId) {
+      await interaction.reply({ content: "Gaming postmortems require a Discord server.", ephemeral: true });
+      return;
+    }
+    const postmortem = analyzeDeath(interaction.guildId);
+    await interaction.reply({
+      content: postmortem.detected
+        ? [
+          `Likely cause: ${postmortem.cause} (${(postmortem.confidence * 100).toFixed(0)}% evidence confidence)`,
+          `Cycle risk: ${postmortem.cycleRisk}${postmortem.repeatedPattern ? ` — ${postmortem.repeatedPattern}` : ""}`,
+          `Preparation: ${postmortem.preparation.join(" ")}`,
+          `Unknowns: ${postmortem.unknowns.join(" ")}`
+        ].join("\n").slice(0, 2000)
+        : postmortem.cause,
+      ephemeral: true
+    });
+    return;
+  }
+
+  if (action === "diagnostics" || action === "rea-review") {
+    if (!interaction.guildId) {
+      await interaction.reply({ content: "Gaming diagnostics require a Discord server.", ephemeral: true });
+      return;
+    }
+    const summary = getDiagnosticSummary(interaction.guildId);
+    if (action === "rea-review") {
+      await interaction.deferReply({ ephemeral: true });
+      const providers = await requestReaInvestigation(interaction.guildId);
+      await interaction.editReply({ content: providers.map(item => `${item.provider}: ${item.status}${item.reference ? ` (${item.reference})` : ""}`).join("\n") });
+      return;
+    }
+    const accuracy = summary.accuracy === undefined ? "no feedback" : `${(summary.accuracy * 100).toFixed(1)}%`;
+    await interaction.reply({
+      content: [
+        `Evidence: ${summary.total} | failures: ${summary.failures} | degraded: ${summary.degraded}`,
+        `Average latency: ${summary.averageLatencyMs} ms | feedback accuracy: ${accuracy}`,
+        `Likely causes: ${summary.likelyCauses.join("; ") || "none yet"}`,
+        `Recommendations: ${summary.recommendations.join(" ")}`
+      ].join("\n").slice(0, 2000),
+      ephemeral: true
+    });
     return;
   }
 

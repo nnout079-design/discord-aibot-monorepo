@@ -16,7 +16,11 @@ export type ControlHandler = (action: ControlAction, body: unknown) => Promise<C
 
 const MAX_BODY_BYTES = 4096;
 
-const CONTROL_PATHS: Record<string, ControlAction> = { "/sync/start": "start", "/sync/stop": "stop", "/sync/now-playing": "now-playing" };
+const CONTROL_PATHS: Record<string, ControlAction> = {
+  "/sync/start": "start",
+  "/sync/stop": "stop",
+  "/sync/now-playing": "now-playing",
+};
 
 const sha256 = (value: string) => crypto.createHash("sha256").update(value).digest();
 
@@ -68,16 +72,18 @@ export class CompanionHub {
   }
 
   listen(port: number): Promise<number> {
-    this.ping ??= setInterval(() => this.clients.forEach(res => res.write(": ping\n\n")), 15000);
-    return new Promise(resolve => this.server.listen(port, () => resolve((this.server.address() as AddressInfo).port)));
+    this.ping ??= setInterval(() => this.clients.forEach((res) => res.write(": ping\n\n")), 15000);
+    return new Promise((resolve) =>
+      this.server.listen(port, () => resolve((this.server.address() as AddressInfo).port))
+    );
   }
 
   close(): Promise<void> {
     if (this.ping) clearInterval(this.ping);
     this.ping = null;
-    this.clients.forEach(res => res.end());
+    this.clients.forEach((res) => res.end());
     this.clients.clear();
-    return new Promise(resolve => this.server.close(() => resolve()));
+    return new Promise((resolve) => this.server.close(() => resolve()));
   }
 
   setControl(handler: ControlHandler): void {
@@ -86,7 +92,7 @@ export class CompanionHub {
 
   publish(event: HubEvent): void {
     this.armed = event.type === "song-entry" ? event : null;
-    this.clients.forEach(res => writeEvent(res, event));
+    this.clients.forEach((res) => writeEvent(res, event));
   }
 
   private authorized(req: http.IncomingMessage): boolean {
@@ -95,7 +101,11 @@ export class CompanionHub {
     return crypto.timingSafeEqual(sha256(given), sha256(this.token));
   }
 
-  private async handleControl(action: ControlAction, req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
+  private async handleControl(
+    action: ControlAction,
+    req: http.IncomingMessage,
+    res: http.ServerResponse
+  ): Promise<void> {
     if (!this.token) {
       sendJson(res, 503, { error: "COMPANION_TOKEN is not configured on the bot" });
       return;
@@ -154,7 +164,11 @@ export class CompanionHub {
         res.writeHead(401).end("unauthorized");
         return;
       }
-      res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache", connection: "keep-alive" });
+      res.writeHead(200, {
+        "content-type": "text/event-stream",
+        "cache-control": "no-cache",
+        connection: "keep-alive",
+      });
       res.write(": connected\n\n");
       this.clients.add(res);
       req.on("close", () => this.clients.delete(res));

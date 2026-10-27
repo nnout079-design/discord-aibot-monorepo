@@ -4,8 +4,20 @@ import { companionHub } from "./companion-hub";
 import { companionControl, getSession, COMPANION_SESSION, parseStartRequest } from "./session";
 
 test("parseStartRequest validates pattern and ranges", () => {
-  assert.deepEqual(parseStartRequest({}), { pattern: undefined, bpm: undefined, lead: undefined, beats: undefined, username: undefined });
-  assert.deepEqual(parseStartRequest({ pattern: "afrobeat", bpm: 120, lead: 4, beats: 3 }), { pattern: "afrobeat", bpm: 120, lead: 4, beats: 3, username: undefined });
+  assert.deepEqual(parseStartRequest({}), {
+    pattern: undefined,
+    bpm: undefined,
+    lead: undefined,
+    beats: undefined,
+    username: undefined,
+  });
+  assert.deepEqual(parseStartRequest({ pattern: "afrobeat", bpm: 120, lead: 4, beats: 3 }), {
+    pattern: "afrobeat",
+    bpm: 120,
+    lead: 4,
+    beats: 3,
+    username: undefined,
+  });
   assert.throws(() => parseStartRequest({ pattern: "polka" }), /pattern must be one of: afrobeat/);
   assert.throws(() => parseStartRequest({ bpm: 500 }), /bpm must be a number from 40 to 240/);
   assert.throws(() => parseStartRequest({ lead: "soon" }), /lead/);
@@ -31,7 +43,10 @@ test("companionControl arms a bar-aligned entry and stops it", async () => {
     assert.equal(getSession(COMPANION_SESSION), undefined);
     const events: string[] = [];
     const publish = companionHub.publish.bind(companionHub);
-    companionHub.publish = event => { events.push(event.type); publish(event); };
+    companionHub.publish = (event) => {
+      events.push(event.type);
+      publish(event);
+    };
     try {
       assert.deepEqual((await companionControl("stop", {})).body, { stopped: false });
     } finally {

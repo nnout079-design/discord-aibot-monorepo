@@ -4,7 +4,7 @@ WORKDIR /app
 
 RUN apk add --no-cache python3 make g++
 
-COPY package.json package-lock.json ./
+COPY package.json ./
 RUN npm install --ignore-scripts --no-audit --fund=false
 
 COPY tsconfig.json ./

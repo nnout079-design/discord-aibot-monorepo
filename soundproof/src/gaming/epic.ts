@@ -11,7 +11,13 @@ export function detectGameFromText(text: string): string {
   const normalized = text.toLowerCase();
   if (normalized.includes("fortnite")) return "fortnite";
   if (normalized.includes("rocket league") || normalized.includes("rocketleague")) return "rocket league";
-  if (normalized.includes("grand theft auto") || normalized.includes("gta v") || normalized.includes("gta 5") || normalized.includes("los santos")) return "grand theft auto v";
+  if (
+    normalized.includes("grand theft auto") ||
+    normalized.includes("gta v") ||
+    normalized.includes("gta 5") ||
+    normalized.includes("los santos")
+  )
+    return "grand theft auto v";
   return "unknown";
 }
 
@@ -20,7 +26,7 @@ export function getEpicGameLink(game: string): EpicGameLink {
   return {
     game: normalizedGame,
     launchUri: `com.epicgames.launcher://apps/${encodeURIComponent(normalizedGame)}?action=launch&silent=true`,
-    configured: Boolean(epicClientId && epicClientSecret)
+    configured: Boolean(epicClientId && epicClientSecret),
   };
 }
 

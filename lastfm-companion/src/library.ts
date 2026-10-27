@@ -34,7 +34,8 @@ function walk(dir: string, out: string[]): void {
   }
   for (const entry of entries) {
     const full = path.join(dir, entry.name);
-    const isDir = entry.isDirectory() || (entry.isSymbolicLink() && fs.statSync(full, { throwIfNoEntry: false })?.isDirectory());
+    const isDir =
+      entry.isDirectory() || (entry.isSymbolicLink() && fs.statSync(full, { throwIfNoEntry: false })?.isDirectory());
     if (isDir) walk(full, out);
     else if (MIDI_EXT.test(entry.name)) out.push(full);
   }
@@ -45,11 +46,13 @@ function walk(dir: string, out: string[]): void {
 export function indexLibrary(root: string): LibraryEntry[] {
   const files: string[] = [];
   walk(root, files);
-  return files.map(file => {
+  return files.map((file) => {
     const rel = path.relative(root, file).split(path.sep);
     const base = path.basename(file).replace(MIDI_EXT, "");
-    const source: LibraryEntry["source"] = rel[0] === "lakh" ? "lakh" : rel[0] === "transcribed" ? "transcribed" : "file";
-    if (source === "lakh") return { path: file, artist: rel[rel.length - 2] ?? "", title: base.replace(/\.\d+$/, ""), source };
+    const source: LibraryEntry["source"] =
+      rel[0] === "lakh" ? "lakh" : rel[0] === "transcribed" ? "transcribed" : "file";
+    if (source === "lakh")
+      return { path: file, artist: rel[rel.length - 2] ?? "", title: base.replace(/\.\d+$/, ""), source };
     const dash = base.indexOf(" - ");
     if (dash > 0) return { path: file, artist: base.slice(0, dash), title: base.slice(dash + 3), source };
     return { path: file, artist: rel.length > 1 ? rel[rel.length - 2] : "", title: base, source };
@@ -60,6 +63,6 @@ export function findSong(entries: LibraryEntry[], artist: string, title: string)
   const a = normalize(artist);
   const t = normalize(title);
   return entries
-    .filter(entry => normalize(entry.title) === t && normalize(entry.artist) === a)
+    .filter((entry) => normalize(entry.title) === t && normalize(entry.artist) === a)
     .sort((x, y) => SOURCE_RANK[x.source] - SOURCE_RANK[y.source]);
 }

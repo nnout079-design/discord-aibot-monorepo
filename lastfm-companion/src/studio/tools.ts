@@ -28,14 +28,19 @@ export function tool(name: "fluidsynth" | "ffmpeg"): string {
   return findIn(TOOLS_DIR, exe(name)) ?? name;
 }
 
-export function run(name: "fluidsynth" | "ffmpeg", args: string[], options: { cwd?: string; capture?: boolean } = {}): string {
+export function run(
+  name: "fluidsynth" | "ffmpeg",
+  args: string[],
+  options: { cwd?: string; capture?: boolean } = {}
+): string {
   const result = spawnSync(tool(name), args, {
     cwd: options.cwd,
     encoding: "utf8",
     maxBuffer: 64 * 1024 * 1024,
-    stdio: options.capture ? ["ignore", "pipe", "pipe"] : ["ignore", "ignore", "pipe"]
+    stdio: options.capture ? ["ignore", "pipe", "pipe"] : ["ignore", "ignore", "pipe"],
   });
   if (result.error) throw new Error(`${name} not found. Run: npm run studio setup`);
-  if (result.status !== 0) throw new Error(`${name} failed:\n${(result.stderr ?? "").split("\n").slice(-12).join("\n")}`);
+  if (result.status !== 0)
+    throw new Error(`${name} failed:\n${(result.stderr ?? "").split("\n").slice(-12).join("\n")}`);
   return `${result.stdout ?? ""}${result.stderr ?? ""}`;
 }

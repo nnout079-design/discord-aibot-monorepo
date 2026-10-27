@@ -7,7 +7,7 @@ const DRUM_CHANNEL = 9;
 // Gives each distinct GM program in `sections` its own channel (drums on 10), so any GM synth plays it right.
 export function channelPlan(rig: Rig, sections: string[]): Map<string, { channel: number; program: number }> {
   const programs = new Map<number, number>();
-  const free = [...Array(16).keys()].filter(c => c !== DRUM_CHANNEL);
+  const free = [...Array(16).keys()].filter((c) => c !== DRUM_CHANNEL);
   const plan = new Map<string, { channel: number; program: number }>();
   for (const name of sections) {
     const section = rig.sections[name];
@@ -44,7 +44,7 @@ export function scoreToMidi(score: Score, rig: Rig, bpm: number, sections = scor
       midi: note.note,
       velocity: note.velocity / 127,
       time: note.timeMs / 1000,
-      duration: Math.max(0.01, note.durationMs / 1000)
+      duration: Math.max(0.01, note.durationMs / 1000),
     });
   }
   return midi.toArray();

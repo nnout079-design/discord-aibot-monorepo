@@ -30,11 +30,33 @@ export interface Rig {
 
 // When everything shares one General MIDI synth, each compact channel plays one sound.
 export const COMPACT_PROGRAMS: Record<number, number | null> = {
-  1: 33, 2: 81, 3: 90, 4: 48, 5: 61, 6: 73, 7: 52, 8: 19,
-  9: 46, 10: null, 11: 104, 12: 21, 13: 110, 14: 60, 15: 47, 16: 116
+  1: 33,
+  2: 81,
+  3: 90,
+  4: 48,
+  5: 61,
+  6: 73,
+  7: 52,
+  8: 19,
+  9: 46,
+  10: null,
+  11: 104,
+  12: 21,
+  13: 110,
+  14: 60,
+  15: 47,
+  16: 116,
 };
 
-type Def = [label: string, group: string, port: string, channel: number, program: number | "drums", range: [number, number] | null, compact: number];
+type Def = [
+  label: string,
+  group: string,
+  port: string,
+  channel: number,
+  program: number | "drums",
+  range: [number, number] | null,
+  compact: number,
+];
 
 const DEFS: Record<string, Def> = {
   percussionA: ["Percussion set A", "Percussion", "main", 10, "drums", null, 10],
@@ -91,7 +113,7 @@ const DEFS: Record<string, Def> = {
   romanTuba: ["Roman tuba", "Roman imperial orchestra", "epic", 6, 58, [28, 58], 14],
   romanWarDrums: ["War drums", "Roman imperial orchestra", "epic", 7, 116, [24, 48], 16],
 
-  hardanger: ["Hardanger fiddle", "Hardanger fiddle", "epic", 8, 110, [55, 96], 13]
+  hardanger: ["Hardanger fiddle", "Hardanger fiddle", "epic", 8, 110, [55, 96], 13],
 };
 
 export const DEFAULT_RIG: Rig = {
@@ -102,32 +124,47 @@ export const DEFAULT_RIG: Rig = {
     organ: "Rig Organ",
     world: "Rig World",
     epic: "Rig Epic",
-    dj: "Rig DJ"
+    dj: "Rig DJ",
   },
   mainPort: "main",
   djPort: "dj",
-  sections: Object.fromEntries(Object.entries(DEFS).map(([name, [label, group, port, channel, program, range, compactChannel]]) => [name, {
-    label,
-    group,
-    port,
-    channel,
-    ...(program === "drums" ? { drums: true } : { program }),
-    ...(range && { range }),
-    compactChannel
-  }]))
+  sections: Object.fromEntries(
+    Object.entries(DEFS).map(([name, [label, group, port, channel, program, range, compactChannel]]) => [
+      name,
+      {
+        label,
+        group,
+        port,
+        channel,
+        ...(program === "drums" ? { drums: true } : { program }),
+        ...(range && { range }),
+        compactChannel,
+      },
+    ])
+  ),
 };
 
 export function validateRig(rig: Rig): Rig {
   if (!rig.ports?.[rig.mainPort]) throw new Error(`rig.json: mainPort "${rig.mainPort}" is not in ports`);
   for (const [name, section] of Object.entries(rig.sections ?? {})) {
     if (!rig.ports[section.port]) throw new Error(`rig.json: section ${name} uses unknown port "${section.port}"`);
-    for (const [key, value] of [["channel", section.channel], ["compactChannel", section.compactChannel]] as const) {
-      if (!Number.isInteger(value) || value < 1 || value > 16) throw new Error(`rig.json: section ${name} ${key} must be 1-16`);
+    for (const [key, value] of [
+      ["channel", section.channel],
+      ["compactChannel", section.compactChannel],
+    ] as const) {
+      if (!Number.isInteger(value) || value < 1 || value > 16)
+        throw new Error(`rig.json: section ${name} ${key} must be 1-16`);
     }
-    if (section.program !== undefined && (!Number.isInteger(section.program) || section.program < 0 || section.program > 127)) {
+    if (
+      section.program !== undefined &&
+      (!Number.isInteger(section.program) || section.program < 0 || section.program > 127)
+    ) {
       throw new Error(`rig.json: section ${name} program must be 0-127`);
     }
-    if (section.range && !(section.range[0] >= 0 && section.range[1] <= 127 && section.range[1] - section.range[0] >= 11)) {
+    if (
+      section.range &&
+      !(section.range[0] >= 0 && section.range[1] <= 127 && section.range[1] - section.range[0] >= 11)
+    ) {
       throw new Error(`rig.json: section ${name} range must span at least an octave within 0-127`);
     }
   }
@@ -146,6 +183,6 @@ export function loadRig(path = "rig.json"): Rig {
       Object.entries({ ...DEFAULT_RIG.sections, ...custom.sections })
         .filter(([, section]) => section !== null)
         .map(([name, section]) => [name, { ...DEFAULT_RIG.sections[name], ...section }])
-    )
+    ),
   });
 }

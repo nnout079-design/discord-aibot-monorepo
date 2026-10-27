@@ -14,8 +14,17 @@ export interface DmxOutput {
 // ArtDmx packet (Art-Net 4): "Art-Net\0", OpOutput 0x5000 little-endian, protocol 14, sequence, physical, SubUni, Net, length big-endian.
 export function artnetPacket(data: Uint8Array, universe: number, sequence: number): Buffer {
   const header = Buffer.from([
-    ...Buffer.from("Art-Net\0", "ascii"), 0x00, 0x50, 0, 14, sequence & 0xff, 0,
-    universe & 0xff, (universe >> 8) & 0x7f, (data.length >> 8) & 0xff, data.length & 0xff
+    ...Buffer.from("Art-Net\0", "ascii"),
+    0x00,
+    0x50,
+    0,
+    14,
+    sequence & 0xff,
+    0,
+    universe & 0xff,
+    (universe >> 8) & 0x7f,
+    (data.length >> 8) & 0xff,
+    data.length & 0xff,
   ]);
   return Buffer.concat([header, Buffer.from(data)]);
 }
@@ -31,14 +40,18 @@ class ArtNetOutput implements DmxOutput {
   private sequence = 0;
   readonly name: string;
 
-  constructor(private host: string, private universe: number, log: (message: string) => void) {
+  constructor(
+    private host: string,
+    private universe: number,
+    log: (message: string) => void
+  ) {
     this.name = `Art-Net ${host} universe ${universe}`;
-    this.socket.on("error", error => log(`Art-Net: ${error.message}`));
+    this.socket.on("error", (error) => log(`Art-Net: ${error.message}`));
     this.socket.bind(() => this.socket.setBroadcast(true));
   }
 
   send(universe: Uint8Array): void {
-    this.sequence = this.sequence % 255 + 1;
+    this.sequence = (this.sequence % 255) + 1;
     this.socket.send(artnetPacket(universe, this.universe, this.sequence), ARTNET_PORT, this.host);
   }
 
@@ -51,9 +64,13 @@ class SerialDmxOutput implements DmxOutput {
   private busy = false;
   readonly name: string;
 
-  constructor(private port: SerialPort, private pro: boolean, private log: (message: string) => void) {
+  constructor(
+    private port: SerialPort,
+    private pro: boolean,
+    private log: (message: string) => void
+  ) {
     this.name = `${pro ? "Enttec DMX USB Pro" : "Open DMX USB"} on ${port.path}`;
-    port.on("error", error => log(`${this.name}: ${error.message}`));
+    port.on("error", (error) => log(`${this.name}: ${error.message}`));
   }
 
   send(universe: Uint8Array): void {
@@ -68,9 +85,9 @@ class SerialDmxOutput implements DmxOutput {
       return;
     }
     // Open DMX: the PC makes the DMX break itself, then sends start code 0 and the 512 channels at 250 kbaud.
-    this.port.set({ brk: true }, error => {
+    this.port.set({ brk: true }, (error) => {
       if (error) return done(error);
-      this.port.set({ brk: false }, error2 => {
+      this.port.set({ brk: false }, (error2) => {
         if (error2) return done(error2);
         this.port.write(Buffer.concat([Buffer.from([0]), Buffer.from(universe)]), done);
       });
@@ -86,13 +103,21 @@ export class LogOutput implements DmxOutput {
   readonly name = "the log";
   private last = 0;
 
-  constructor(private log: (message: string) => void, private fixtures: LightsConfig["fixtures"], private everyMs = 1000) {}
+  constructor(
+    private log: (message: string) => void,
+    private fixtures: LightsConfig["fixtures"],
+    private everyMs = 1000
+  ) {}
 
   send(universe: Uint8Array): void {
     const now = Date.now();
     if (now - this.last < this.everyMs) return;
     this.last = now;
-    this.log(this.fixtures.map(f => `${f.name} @${f.address}: ${[...universe.subarray(f.address - 1, f.address + 7)].join(" ")}`).join(" | "));
+    this.log(
+      this.fixtures
+        .map((f) => `${f.name} @${f.address}: ${[...universe.subarray(f.address - 1, f.address + 7)].join(" ")}`)
+        .join(" | ")
+    );
   }
 
   close(): void {}
@@ -102,7 +127,7 @@ const DMX_PORT = /ftdi|enttec|dmx|0403/i;
 
 export async function dmxPorts(): Promise<{ path: string; label: string; likely: boolean }[]> {
   const ports = await SerialPort.list();
-  return ports.map(p => {
+  return ports.map((p) => {
     const label = [p.manufacturer, p.pnpId, p.vendorId && `VID ${p.vendorId}`].filter(Boolean).join(", ");
     return { path: p.path, label, likely: DMX_PORT.test(`${label} ${p.vendorId ?? ""}`) };
   });
@@ -110,8 +135,15 @@ export async function dmxPorts(): Promise<{ path: string; label: string; likely:
 
 function openSerial(path: string, pro: boolean): Promise<SerialPort> {
   return new Promise((resolve, reject) => {
-    const port = new SerialPort({ path, baudRate: pro ? 57600 : 250000, dataBits: 8, stopBits: 2, parity: "none", autoOpen: false });
-    port.open(error => error ? reject(new Error(`Could not open ${path}: ${error.message}`)) : resolve(port));
+    const port = new SerialPort({
+      path,
+      baudRate: pro ? 57600 : 250000,
+      dataBits: 8,
+      stopBits: 2,
+      parity: "none",
+      autoOpen: false,
+    });
+    port.open((error) => (error ? reject(new Error(`Could not open ${path}: ${error.message}`)) : resolve(port)));
   });
 }
 
@@ -127,8 +159,11 @@ export async function openDmx(config: LightsConfig, log: (message: string) => vo
     case "enttec-pro": {
       let path = config.port ?? "auto";
       if (path === "auto") {
-        const found = (await dmxPorts()).find(p => p.likely);
-        if (!found) throw new Error("No USB-DMX adapter found. Plug it in, or run `npm run lights ports` and set \"port\" in lights.json");
+        const found = (await dmxPorts()).find((p) => p.likely);
+        if (!found)
+          throw new Error(
+            'No USB-DMX adapter found. Plug it in, or run `npm run lights ports` and set "port" in lights.json'
+          );
         path = found.path;
       }
       const pro = config.output === "enttec-pro";

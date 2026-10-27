@@ -7,7 +7,8 @@ import { SOUNDFONT, tool, TOOLS_DIR } from "./tools";
 
 // MuseScore General (MIT): a complete General MIDI soundfont, so every rig section has a real sound.
 const SOUNDFONT_URL = "https://ftp.osuosl.org/pub/musescore/soundfont/MuseScore_General/MuseScore_General.sf3";
-const FLUIDSYNTH_WIN = "https://github.com/FluidSynth/fluidsynth/releases/download/v2.6.1/fluidsynth-v2.6.1-win10-x64-cpp11.zip";
+const FLUIDSYNTH_WIN =
+  "https://github.com/FluidSynth/fluidsynth/releases/download/v2.6.1/fluidsynth-v2.6.1-win10-x64-cpp11.zip";
 const FFMPEG_WIN = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip";
 
 async function download(url: string, file: string): Promise<void> {
@@ -15,7 +16,10 @@ async function download(url: string, file: string): Promise<void> {
   const response = await fetch(url, { redirect: "follow" });
   if (!response.ok || !response.body) throw new Error(`Download failed (${response.status}): ${url}`);
   fs.mkdirSync(path.dirname(file), { recursive: true });
-  await pipeline(Readable.fromWeb(response.body as import("node:stream/web").ReadableStream), fs.createWriteStream(file));
+  await pipeline(
+    Readable.fromWeb(response.body as import("node:stream/web").ReadableStream),
+    fs.createWriteStream(file)
+  );
 }
 
 function works(name: "fluidsynth" | "ffmpeg"): boolean {
@@ -37,7 +41,10 @@ export async function setup(): Promise<void> {
   if (fs.existsSync(SOUNDFONT)) console.log(`Soundfont: ${SOUNDFONT}`);
   else await download(SOUNDFONT_URL, SOUNDFONT);
 
-  for (const [name, url] of [["fluidsynth", FLUIDSYNTH_WIN], ["ffmpeg", FFMPEG_WIN]] as const) {
+  for (const [name, url] of [
+    ["fluidsynth", FLUIDSYNTH_WIN],
+    ["ffmpeg", FFMPEG_WIN],
+  ] as const) {
     if (works(name)) {
       console.log(`${name}: ${tool(name)}`);
     } else if (process.platform === "win32") {
@@ -45,8 +52,10 @@ export async function setup(): Promise<void> {
       if (!works(name)) throw new Error(`${name} still doesn't run after download`);
       console.log(`${name}: ${tool(name)}`);
     } else {
-      throw new Error(`${name} is missing. Install it (e.g. sudo apt install ${name} or brew install ${name}) and run setup again`);
+      throw new Error(
+        `${name} is missing. Install it (e.g. sudo apt install ${name} or brew install ${name}) and run setup again`
+      );
     }
   }
-  console.log("Studio ready. Try: npm run studio \"song=Queen - Bohemian Rhapsody\"");
+  console.log('Studio ready. Try: npm run studio "song=Queen - Bohemian Rhapsody"');
 }

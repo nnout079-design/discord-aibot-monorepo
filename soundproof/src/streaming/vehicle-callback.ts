@@ -1,6 +1,7 @@
 import { Client, TextChannel } from "discord.js";
 import { normalizeTelemetry, updateGameState } from "../gaming/game-state";
 import { evaluateGameRules } from "../gaming/rules";
+import { sendPushbulletNote } from "../notifications/pushbullet";
 import { VehicleDetectionResult } from "./audio-events-client";
 
 let discordClient: Client | undefined;
@@ -58,6 +59,17 @@ export async function handleVehicleDetection(input: VehicleCallbackInput): Promi
 
   const reaction = evaluateGameRules(updateGameState(telemetry));
   await sendWebhook(input);
+  if (/siren|emergency|police|ambulance|fire engine/i.test(topLabel)) {
+    await sendPushbulletNote({
+      title: `${input.game ?? "Game"}: emergency vehicle detected`,
+      body: `${topLabel} detected from ${input.source} audio at ${new Date().toISOString()}.`
+    }, `vehicle-emergency:${input.guildId}:${topLabel}`, 300_000);
+  } else if (/drone|uav|quadcopter|rotorcraft|helicopter|aircraft|jet|propeller|fixed-wing/i.test(topLabel)) {
+    await sendPushbulletNote({
+      title: `${input.game ?? "Game"}: aerial threat detected`,
+      body: `${topLabel} detected from ${input.source} audio at ${new Date().toISOString()}. Watch the sky for drones or flyovers.`
+    }, `vehicle-aerial:${input.guildId}:${topLabel}`, 300_000);
+  }
 
   if (reaction && discordClient) {
     try {

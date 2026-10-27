@@ -25,27 +25,31 @@ export interface Song {
   parts: Part[];
 }
 
-const ROLE_BY_NAME: [RegExp, Role][] = [[/\bvocals?\b|\bmelody\b|\blead\b/i, "melody"], [/\bbass\b/i, "bass"], [/\bother\b|\bchords?\b/i, "chords"]];
+const ROLE_BY_NAME: [RegExp, Role][] = [
+  [/\bvocals?\b|\bmelody\b|\blead\b/i, "melody"],
+  [/\bbass\b/i, "bass"],
+  [/\bother\b|\bchords?\b/i, "chords"],
+];
 
 export function parseMidi(data: ArrayLike<number> | ArrayBuffer): Song {
   const midi = new Midi(data);
   const parts: Part[] = midi.tracks
-    .filter(track => track.notes.length > 0)
-    .map(track => ({
+    .filter((track) => track.notes.length > 0)
+    .map((track) => ({
       name: track.name,
       program: track.instrument.number,
       drums: track.channel === 9 || track.instrument.percussion,
       role: ROLE_BY_NAME.find(([pattern]) => pattern.test(track.name))?.[1],
-      notes: track.notes.map(n => ({
+      notes: track.notes.map((n) => ({
         note: n.midi,
         velocity: Math.round(n.velocity * 127),
         timeMs: n.time * 1000,
-        durationMs: n.duration * 1000
-      }))
+        durationMs: n.duration * 1000,
+      })),
     }));
   const tempo = midi.header.tempos[0]?.bpm ?? 0;
   const beatsPerBar = midi.header.timeSignatures[0]?.timeSignature[0] ?? 4;
-  const durationMs = Math.max(0, ...parts.flatMap(p => p.notes.map(n => n.timeMs + n.durationMs)));
+  const durationMs = Math.max(0, ...parts.flatMap((p) => p.notes.map((n) => n.timeMs + n.durationMs)));
   return { bpm: tempo, beatsPerBar, durationMs, parts };
 }
 
@@ -56,9 +60,9 @@ export function stretch(song: Song, ratio: number): Song {
     ...song,
     bpm: song.bpm / ratio,
     durationMs: song.durationMs * ratio,
-    parts: song.parts.map(part => ({
+    parts: song.parts.map((part) => ({
       ...part,
-      notes: part.notes.map(n => ({ ...n, timeMs: n.timeMs * ratio, durationMs: n.durationMs * ratio }))
-    }))
+      notes: part.notes.map((n) => ({ ...n, timeMs: n.timeMs * ratio, durationMs: n.durationMs * ratio })),
+    })),
   };
 }

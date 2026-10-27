@@ -5,19 +5,20 @@ import { Part, PartNote, Role, Song } from "./song";
 export type Style = "classical" | "electronic" | "bangla" | "balkan" | "taiko" | "roman" | "hardanger";
 
 export const STYLE_TAGS: Record<Style, RegExp> = {
-  classical: /classical|orchestral|symphon|soundtrack|score|choral|choir|gospel|church|hymn|baroque|opera|cinematic|epic/,
+  classical:
+    /classical|orchestral|symphon|soundtrack|score|choral|choir|gospel|church|hymn|baroque|opera|cinematic|epic/,
   electronic: /electro|edm|house|techno|trance|synth|dance|dubstep|drum and bass|dnb|ambient|idm/,
   bangla: /bangla|bengali|bangladesh|indian|bollywood|desi|hindustani|qawwali|baul/,
   balkan: /balkan|gypsy|romani|klezmer|turbo ?folk|serbian|bulgarian|macedonian|bosnian|greek/,
   taiko: /japan|taiko|j-?rock|j-?pop|anime|visual kei|enka/,
   roman: /epic|cinematic|trailer|soundtrack|heroic|war|battle|symphonic metal|power metal|italian/,
-  hardanger: /folk|norw|nordic|scandinav|celtic|irish|viking|fiddle/
+  hardanger: /folk|norw|nordic|scandinav|celtic|irish|viking|fiddle/,
 };
 
 export function stylesFor(tags: string[], all = false): Set<Style> {
   if (all) return new Set(Object.keys(STYLE_TAGS) as Style[]);
   const text = tags.join(" ").toLowerCase();
-  return new Set((Object.keys(STYLE_TAGS) as Style[]).filter(style => STYLE_TAGS[style].test(text)));
+  return new Set((Object.keys(STYLE_TAGS) as Style[]).filter((style) => STYLE_TAGS[style].test(text)));
 }
 
 // GM program family -> sections that split the part by pitch (first section whose range fits).
@@ -58,21 +59,25 @@ const median = (values: number[]) => {
 
 export function assignRoles(parts: Part[]): Map<Part, Role> {
   const roles = new Map<Part, Role>();
-  const pitched = parts.filter(p => !p.drums);
+  const pitched = parts.filter((p) => !p.drums);
   for (const part of parts) {
     if (part.role) roles.set(part, part.role);
     else if (part.drums) roles.set(part, "drums");
     else if (part.program >= 32 && part.program <= 39) roles.set(part, "bass");
   }
-  const free = pitched.filter(p => !roles.has(p));
+  const free = pitched.filter((p) => !roles.has(p));
   if (![...roles.values()].includes("bass") && free.length > 1) {
-    const lowest = free.reduce((a, b) => median(a.notes.map(n => n.note)) <= median(b.notes.map(n => n.note)) ? a : b);
-    if (median(lowest.notes.map(n => n.note)) < 52) roles.set(lowest, "bass");
+    const lowest = free.reduce((a, b) =>
+      median(a.notes.map((n) => n.note)) <= median(b.notes.map((n) => n.note)) ? a : b
+    );
+    if (median(lowest.notes.map((n) => n.note)) < 52) roles.set(lowest, "bass");
   }
   if (![...roles.values()].includes("melody")) {
-    const candidates = pitched.filter(p => !roles.has(p) && p.notes.length >= 16);
+    const candidates = pitched.filter((p) => !roles.has(p) && p.notes.length >= 16);
     if (candidates.length) {
-      const top = candidates.reduce((a, b) => median(a.notes.map(n => n.note)) >= median(b.notes.map(n => n.note)) ? a : b);
+      const top = candidates.reduce((a, b) =>
+        median(a.notes.map((n) => n.note)) >= median(b.notes.map((n) => n.note)) ? a : b
+      );
       roles.set(top, "melody");
     }
   }
@@ -102,14 +107,15 @@ interface Layer {
   top?: boolean;
 }
 
-const drumMap = (pairs: [Set<number>, number][]) => new Map(pairs.flatMap(([set, note]) => [...set].map(n => [n, note] as [number, number])));
+const drumMap = (pairs: [Set<number>, number][]) =>
+  new Map(pairs.flatMap(([set, note]) => [...set].map((n) => [n, note] as [number, number])));
 
 const ALWAYS: Layer[] = [
   { section: "percussionB", from: "drums", velocity: 0.8 },
   { section: "bassB", from: "bass", velocity: 0.9 },
   { section: "organPedal", from: "bass", velocity: 0.7 },
   { section: "choirSoprano", from: "melody", velocity: 0.75, top: true },
-  { section: "timpani", from: "drums", drumMap: 43, filter: KICKS, velocity: 0.7 }
+  { section: "timpani", from: "drums", drumMap: 43, filter: KICKS, velocity: 0.7 },
 ];
 
 const STYLE_LAYERS: Record<Style, Layer[]> = {
@@ -122,39 +128,69 @@ const STYLE_LAYERS: Record<Style, Layer[]> = {
     { section: "choirAlto", from: "chords", velocity: 0.7 },
     { section: "choirTenor", from: "chords", velocity: 0.7 },
     { section: "choirBass", from: "bass", velocity: 0.7 },
-    { section: "horns", from: "chords", velocity: 0.6 }
+    { section: "horns", from: "chords", velocity: 0.6 },
   ],
   electronic: [
     { section: "moogA", from: "melody", top: true },
-    { section: "moogB", from: "chords", velocity: 0.8 }
+    { section: "moogB", from: "chords", velocity: 0.8 },
   ],
   bangla: [
     { section: "banglaSitar", from: "melody", top: true },
     { section: "banglaBansuri", from: "melody", transpose: 12, velocity: 0.7, top: true },
     { section: "banglaDotara", from: "chords", velocity: 0.8 },
     { section: "banglaEsraj", from: "chords", velocity: 0.6 },
-    { section: "banglaDhol", from: "drums", drumMap: drumMap([[KICKS, 64], [SNARES, 63]]) },
-    { section: "banglaTabla", from: "drums", drumMap: drumMap([[HATS, 60], [SNARES, 61]]), velocity: 0.8 }
+    {
+      section: "banglaDhol",
+      from: "drums",
+      drumMap: drumMap([
+        [KICKS, 64],
+        [SNARES, 63],
+      ]),
+    },
+    {
+      section: "banglaTabla",
+      from: "drums",
+      drumMap: drumMap([
+        [HATS, 60],
+        [SNARES, 61],
+      ]),
+      velocity: 0.8,
+    },
   ],
   balkan: [
     { section: "balkanClarinet", from: "melody", top: true },
     { section: "balkanGaida", from: "melody", velocity: 0.6, top: true },
     { section: "balkanAccordion", from: "chords", velocity: 0.8 },
     { section: "balkanBrass", from: "bass", transpose: 12, velocity: 0.8 },
-    { section: "balkanTapan", from: "drums", drumMap: drumMap([[KICKS, 41], [SNARES, 45]]) }
+    {
+      section: "balkanTapan",
+      from: "drums",
+      drumMap: drumMap([
+        [KICKS, 41],
+        [SNARES, 45],
+      ]),
+    },
   ],
   taiko: [
     { section: "taikoOdaiko", from: "drums", drumMap: 36, filter: KICKS },
     { section: "taikoShime", from: "drums", drumMap: 72, filter: SNARES, velocity: 0.8 },
-    { section: "taikoChappa", from: "drums", drumMap: drumMap([[CYMBALS, 55], [HATS, 55]]), velocity: 0.6 }
+    {
+      section: "taikoChappa",
+      from: "drums",
+      drumMap: drumMap([
+        [CYMBALS, 55],
+        [HATS, 55],
+      ]),
+      velocity: 0.6,
+    },
   ],
   roman: [
     { section: "romanCornu", from: "melody", transpose: -12, top: true },
     { section: "romanBuccina", from: "chords", velocity: 0.7, top: true },
     { section: "romanTuba", from: "bass" },
-    { section: "romanWarDrums", from: "drums", drumMap: 36, filter: new Set([...KICKS, ...SNARES]) }
+    { section: "romanWarDrums", from: "drums", drumMap: 36, filter: new Set([...KICKS, ...SNARES]) },
   ],
-  hardanger: [{ section: "hardanger", from: "melody", top: true }]
+  hardanger: [{ section: "hardanger", from: "melody", top: true }],
 };
 
 export interface OrchestrateOptions {
@@ -177,7 +213,7 @@ export function orchestrate(song: Song, rig: Rig, options: OrchestrateOptions): 
       note: pitched ? moveIntoRange(note, rig.sections[section].range) : note,
       velocity: Math.max(1, Math.round(n.velocity * velocityScale)),
       timeMs: n.timeMs,
-      durationMs: n.durationMs
+      durationMs: n.durationMs,
     });
   };
 
@@ -190,7 +226,7 @@ export function orchestrate(song: Song, rig: Rig, options: OrchestrateOptions): 
     const candidates = roles.get(part) === "bass" ? ["bassA"] : familySections(part.program).filter(has);
     if (candidates.length === 0) continue;
     for (const n of part.notes) {
-      const fit = candidates.find(name => {
+      const fit = candidates.find((name) => {
         const range = rig.sections[name].range;
         return !range || (n.note >= range[0] && n.note <= range[1]);
       });
@@ -198,8 +234,11 @@ export function orchestrate(song: Song, rig: Rig, options: OrchestrateOptions): 
     }
   }
 
-  const byRole = (role: Role) => song.parts.filter(p => roles.get(p) === role).flatMap(p => p.notes);
-  const layers = [...ALWAYS, ...[...stylesFor(options.tags, options.allStyles)].flatMap(style => STYLE_LAYERS[style])];
+  const byRole = (role: Role) => song.parts.filter((p) => roles.get(p) === role).flatMap((p) => p.notes);
+  const layers = [
+    ...ALWAYS,
+    ...[...stylesFor(options.tags, options.allStyles)].flatMap((style) => STYLE_LAYERS[style]),
+  ];
   for (const layer of layers) {
     if (!has(layer.section)) continue;
     const source = layer.top ? topLine(byRole(layer.from)) : byRole(layer.from);
@@ -220,8 +259,8 @@ export function orchestrate(song: Song, rig: Rig, options: OrchestrateOptions): 
   return {
     source: options.source,
     title: options.title,
-    durationMs: Math.max(0, ...notes.map(n => n.timeMs + n.durationMs)),
+    durationMs: Math.max(0, ...notes.map((n) => n.timeMs + n.durationMs)),
     notes,
-    sections: [...new Set(notes.map(n => n.section))]
+    sections: [...new Set(notes.map((n) => n.section))],
   };
 }

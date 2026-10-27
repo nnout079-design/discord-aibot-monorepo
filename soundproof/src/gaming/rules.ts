@@ -1,4 +1,5 @@
 import { GameState } from "./game-state";
+import { recordGuildEvent } from "../progress/tracker";
 
 export interface GameRule {
   id: string;
@@ -108,6 +109,20 @@ const rules: GameRule[] = [
     cooldownSeconds: 90
   },
   {
+    id: "threat-drone",
+    games: ["*"],
+    keywords: ["drone", "uav", "quadcopter", "rotorcraft", "surveillance drone", "aerial drone", "buzzing drone"],
+    response: "Drone detected on stream. Stay in cover and watch the sky.",
+    cooldownSeconds: 60
+  },
+  {
+    id: "threat-ai-unit",
+    games: ["*"],
+    keywords: ["enemy npc", "ai enemy", "enemy bot", "hostile robot", "mech", "sentry", "auto-turret", "autonomous", "hunter-killer"],
+    response: "AI-controlled hostile detected. Expect patrol patterns rather than human behavior.",
+    cooldownSeconds: 90
+  },
+  {
     id: "generic-defeat",
     games: ["*"],
     phases: ["defeat"],
@@ -140,6 +155,7 @@ export function evaluateGameRules(state: GameState): GameReaction | undefined {
     const last = lastReaction.get(`${state.guildId}:${rule.id}`) ?? 0;
     if (gameMatches && phaseMatches && eventMatches && keywordMatches && now - last >= rule.cooldownSeconds * 1000) {
       lastReaction.set(`${state.guildId}:${rule.id}`, now);
+      recordGuildEvent(state.guildId, rule.id, `${state.game}: ${rule.response}`);
       return { ruleId: rule.id, content: rule.response, channelId: state.channelId };
     }
   }

@@ -1,0 +1,213 @@
+
+======================================================================
+  OVERVIEW
+======================================================================
+  Computer: EQPC-CND1520ZJM   User: ddosn   Admin: True
+  Edge user data: C:\Users\ddosn\AppData\Local\Microsoft\Edge\User Data
+  Edge version: 155.0.4283.33
+  Profiles: Default
+
+======================================================================
+  1. EXTENSIONS (per profile)
+======================================================================
+
+  --- Profile: Default ---
+  * Google Translate  [aapbdbdomjkkjkaonfhkkikfgjllcleb]  v2.0.17  (enabled)
+      source: Chrome Web Store; install type: store/user install; installed 2026-09-06
+      sensitive permissions: scripting
+      site access: ALL websites (<all_urls>)
+  * New tab page by start.me  [acifeljplikjhjobbicjiknoeafjoddh]  v7.3.0  (DISABLED)
+      source: Edge Add-ons store; install type: store/user install; installed 2026-09-10
+      sensitive permissions: tabs, bookmarks
+  * Copyfish Free OCR Software  [ankheondabfngkjomknppbpkjcdabdlg]  v7.0.8  (enabled)
+      source: Edge Add-ons store; install type: store/user install; installed 2026-09-10
+      sensitive permissions: scripting, nativeMessaging, clipboardRead
+  [!] Extension 'Copyfish Free OCR Software' (ankheondabfngkjomknppbpkjcdabdlg) can talk to a program outside the browser (nativeMessaging).
+  * DuckDuckGo Search & Tracker Protection  [caoacbimdbbljakfhgikoodekdnlcgpk]  v2026.8.6  (DISABLED)
+      source: Edge Add-ons store; install type: store/user install; installed 2026-09-10
+      sensitive permissions: scripting, tabs, webRequest, cookies
+      site access: ALL websites (*://*/*, <all_urls>)
+  * Grammarly: AI Writing and Grammar Checker App  [cnlefmmeadmemmdciolhbnfeacpdfbkd]  v14.1154.0  (enabled)
+      source: Edge Add-ons store; install type: store/user install; installed 2026-09-10
+      sensitive permissions: scripting, tabs, cookies, clipboardRead
+      site access: ALL websites (http://*/*, https://*/*, <all_urls>)
+  * Browsing Protection  [cpikpibllpjmpnchjajlibnmmomnnhnm]  v8.0.23  (enabled)
+      source: Edge Add-ons store; install type: store/user install; installed 2026-09-10
+      sensitive permissions: tabs, nativeMessaging, webRequest
+      site access: ALL websites (http://*/*, https://*/*, <all_urls>)
+  [!] Extension 'Browsing Protection' (cpikpibllpjmpnchjajlibnmmomnnhnm) can talk to a program outside the browser (nativeMessaging).
+  * YouTube DJ effects / EQ / Volume Booster / Bass Booster  [defekohaofmambflfpfoojkmfdpcbgko]  v121  (enabled)
+      source: Chrome Web Store; install type: store/user install; installed 2026-09-06
+  * Easy Auto Refresh  [digoaejcopelkbkcbiemimccohaooggd]  v6.5  (enabled)
+      source: Edge Add-ons store; install type: store/user install; installed 2026-09-10
+      sensitive permissions: tabs, scripting
+      site access: ALL websites (http://*/*, https://*/*)
+  * Home - New Tab Page | ChatGPT search with GPT-4o AI answers  [ehhkfhegcenpfoanmgfpfhnmdmflkbgk]  v24.12.10.1  (DISABLED)
+      source: Chrome Web Store; install type: store/user install; installed 2026-09-06
+      sensitive permissions: bookmarks, tabs, management, cookies, history
+      site access: ALL websites (http://*/*, https://*/*, <all_urls>)
+  * Live Server Web Extension  [fiegdmejfepffgpnejdinekhfieaogmj]  v2.0.0  (enabled)
+      source: Chrome Web Store; install type: store/user install; installed 2026-09-06
+      site access: ALL websites (http://*/*, https://*/*)
+  * Wayback Machine  [fpnmgdkabkmnadcjpehmlllkndpkmiak]  v3.4.8  (enabled)
+      source: Chrome Web Store; install type: store/user install; installed 2026-09-06
+      sensitive permissions: cookies, scripting, webRequest, bookmarks
+      site access: ALL websites (<all_urls>)
+  [!] Extension 'Wayback Machine' (fpnmgdkabkmnadcjpehmlllkndpkmiak) in 'Default' can READ AND CHANGE YOUR FAVORITES.
+  * Website IP  [ghbmhlgniedlklkpimlibbaoomlpacmk]  v1.5.5  (enabled)
+      source: Chrome Web Store; install type: store/user install; installed 2026-09-06
+      sensitive permissions: tabs, webRequest
+      site access: ALL websites (*://*/*, http://*/*, https://*/*)
+  * Google Docs Offline  [ghbmnnjooekpmoecnnnilnnbdlolhkhi]  v1.110.1  (DISABLED)
+      source: Chrome Web Store; install type: external prefs download; installed 2026-09-06
+  * vLex  [gjdimoodoalmblikhoicpcfnhlkkghgf]  v6.9  (enabled)
+      source: Chrome Web Store; install type: store/user install; installed 2026-09-06
+      sensitive permissions: webRequest
+      site access: ALL websites (*://*/*)
+  * OBJ Viewer  [gndhkbfbiokcbbcebpleobejipbobmnp]  v3.0.0  (enabled)
+      source: Edge Add-ons store; install type: store/user install; installed 2026-09-10
+  * Ui.Vision  [goapmjinbaeomoemgdcnnhoedopjnddd]  v10.0.286  (enabled)
+      source: Edge Add-ons store; install type: store/user install; installed 2026-09-10
+      sensitive permissions: bookmarks, clipboardRead, cookies, debugger, downloads, tabs, proxy, nativeMessaging, webRequest, scripting
+      site access: ALL websites (<all_urls>)
+  [!] Extension 'Ui.Vision' (goapmjinbaeomoemgdcnnhoedopjnddd) in 'Default' can READ AND CHANGE YOUR FAVORITES.
+  [!] Extension 'Ui.Vision' (goapmjinbaeomoemgdcnnhoedopjnddd) can talk to a program outside the browser (nativeMessaging).
+  * IP Address and Domain Information  [gpnmbnkhmcdmgihgbgdpfpopklgkodnb]  v4.0.6.7  (enabled)
+      source: Edge Add-ons store; install type: store/user install; installed 2026-09-10
+  * Pieces for Developers: Copilot & Code Capture  [hglfimcdgonaeeobjckfdabcldfidmim]  v4.1.3  (enabled)
+      source: Edge Add-ons store; install type: store/user install; installed 2026-09-29
+      sensitive permissions: scripting, clipboardRead
+      site access: ALL websites (https://*/*, http://*/*, <all_urls>)
+  * Microsoft Editor: Spelling & Grammar Checker  [hokifickgkhplphjiodbggjmoafhignh]  v1.2410.904  (enabled)
+      source: Edge Add-ons store; install type: store/user install; installed 2026-09-29
+      sensitive permissions: scripting
+      site access: ALL websites (<all_urls>)
+  * HP Dynamic Audio  [iahgjpkfebmcdcaifedofgakoancmoli]  v1.1.4.4  (enabled)
+      source: Edge Add-ons store; install type: store/user install; installed 2026-09-10
+      sensitive permissions: nativeMessaging
+  [!] Extension 'HP Dynamic Audio' (iahgjpkfebmcdcaifedofgakoancmoli) can talk to a program outside the browser (nativeMessaging).
+  * Tag Assistant  [kejbdjndbnbjgmefkgdddjlbokphdefk]  v26.267.11.35  (enabled)
+      source: Chrome Web Store; install type: store/user install; installed 2026-09-06
+      sensitive permissions: scripting, tabs
+      site access: ALL websites (<all_urls>)
+  * Zoom Chrome Extension  [kgjfgplpablkjnlkjmjdecgdpfankdle]  v1.9.16  (enabled)
+      source: Chrome Web Store; install type: store/user install; installed 2026-09-06
+  * Web Clipper (Nimbus)  [kiokdhlcmjagacmcgoikapbjmmhfchbi]  v4.9.9.3  (enabled)
+      source: Chrome Web Store; install type: store/user install; installed 2026-09-06
+      sensitive permissions: tabs, cookies
+      site access: ALL websites (*://*/*, http://*/*, https://*/*)
+  * Wayback Machine  [kjmickeoogghaimmomagaghnogelpcpn]  v3.3.1  (enabled)
+      source: Edge Add-ons store; install type: store/user install; installed 2026-09-10
+      sensitive permissions: cookies, webRequest, webRequestBlocking, bookmarks
+      site access: ALL websites (<all_urls>)
+  [!] Extension 'Wayback Machine' (kjmickeoogghaimmomagaghnogelpcpn) in 'Default' can READ AND CHANGE YOUR FAVORITES.
+  * Evernote Web Clipper  [llhcnbijpnechllogkacbcjmkcgjbjfi]  v7.41.1  (enabled)
+      source: Edge Add-ons store; install type: store/user install; installed 2026-09-10
+      sensitive permissions: tabs, cookies, scripting
+      site access: ALL websites (<all_urls>, http://*/*, https://*/*)
+  * YouTube Music Last.fm Scrobbler  [llpepekkleeoeiloijhcafgpjdnhhcbl]  v3.0.1  (enabled)
+      source: Chrome Web Store; install type: store/user install; installed 2026-09-06
+  * Google Input Tools  [mclkkofklkfljcocdinagocijmpgbhab]  v102  (enabled)
+      source: Chrome Web Store; install type: store/user install; installed 2026-09-06
+      sensitive permissions: tabs, scripting
+      site access: ALL websites (http://*/*, https://*/*)
+  * AdBlock — block ads across the web  [ndcileolkflehcjpmjnfbnaibdcgglog]  v6.47.0  (enabled)
+      source: Edge Add-ons store; install type: store/user install; installed 2026-09-10
+      sensitive permissions: declarativeNetRequestWithHostAccess, scripting, tabs, webRequest, management
+      site access: ALL websites (<all_urls>, http://*/*, https://*/*)
+  * Password Alert  [noondiphcddnnabmjcihcjfbhfklnnep]  v1.38.4  (enabled)
+      source: Chrome Web Store; install type: store/user install; installed 2026-09-06
+      sensitive permissions: scripting, tabs
+      site access: ALL websites (<all_urls>)
+  * OneNote Web Clipper  [oogbnpmeihfgnccdnmmlgicknopghhma]  v3.11.3  (enabled)
+      source: Edge Add-ons store; install type: store/user install; installed 2026-09-10
+      sensitive permissions: scripting, tabs, webRequest
+      site access: ALL websites (<all_urls>)
+  ? ckcbfnpodigdcbjjmhmolhkhlfbepnca (no manifest found; leftover folder)
+  ? ofefcgjbeghpigppfmkologfjadafddi (no manifest found; leftover folder)
+  ? mhffmephdchhhbfjmdpoaldedhhdanbn (no manifest found; leftover folder)
+  ? jngkenaoceimiimeokpdbmejeonaaami (no manifest found; leftover folder)
+  ? kpdpfilpdghammlkfdahigbpgjjebija (no manifest found; leftover folder)
+  ? kmjdnkpkpnjblbgbnkeedepgnomafojk (no manifest found; leftover folder)
+  ? gbmoeijgfngecijpcnbooedokgafmmji (no manifest found; leftover folder)
+  ? kgejglhpjiefppelpmljglcjbhoiplfn (no manifest found; leftover folder)
+  ? jbleckejnaboogigodiafflhkajdmpcl (no manifest found; leftover folder)
+  ? gecfnmoodchdkebjjffmdcmeghkflpib (no manifest found; leftover folder)
+  ? kfihiegbjaloebkmglnjnljoljgkkchm (no manifest found; leftover folder)
+  ? nckgahadagoaajjgafhacjanaoiihapd (no manifest found; leftover folder)
+  ? ehlmnljdoejdahfjdfobmpfancoibmig (no manifest found; leftover folder)
+  ? hfmgbegjielnmfghmoohgmplnpeehike (no manifest found; leftover folder)
+  ? nkbndigcebkoaejohleckhekfmcecfja (no manifest found; leftover folder)
+  ? cjneempfhkonkkbcmnfdibgobmhbagaj (no manifest found; leftover folder)
+  ? gbihlnbpmfkodghomcinpblknjhneknc (no manifest found; leftover folder)
+  ? gcinnojdebelpnodghnoicmcdmamjoch (no manifest found; leftover folder)
+
+======================================================================
+  2. POLICIES AND EXTERNALLY-INSTALLED EXTENSIONS
+======================================================================
+  No Edge policies set (Edge is not managed).
+
+======================================================================
+  3. ACCOUNTS AND SYNC (emails partly masked)
+======================================================================
+
+  --- Profile: Default (Profil 1)
+      signed in as: d***t@outlook.com
+      accounts known to profile: d***t@outlook.com
+      sync settings: has_setup_completed=True; keep_everything_synced=True; bookmarks=True; passwords=True; typed_urls=True
+
+  Favorites sync to whichever account is signed in: make sure each one above is yours.
+
+======================================================================
+  4. NATIVE MESSAGING HOSTS (programs extensions can call)
+======================================================================
+  * com.soundresearch.contentclassifier   (HKCU:\SOFTWARE\Microsoft\Edge\NativeMessagingHosts)
+      manifest: C:\Users\ddosn\AppData\Local\SoundResearch\NativeMessaging\com.soundresearch.contentclassifier.json
+      program: C:\WINDOWS\System32\SECCNH64.exe  [signature: Valid by CN=Microsoft Windows Hardware Compatibility Publisher]
+      allowed extensions: chrome-extension://mljihjcjekkjgdmfpjckdflejkebccap/, chrome-extension://fkhppjmkbifibialnglmjegmgckmkdco/, chrome-extension://iahgjpkfebmcdcaifedofgakoancmoli/, chrome-extension://glfiglflnbbpjednfhagamomjnkldadh/
+  * com.microsoft.defender.browser_extension.native_message_host   (HKLM:\SOFTWARE\Microsoft\Edge\NativeMessagingHosts)
+      manifest: C:\ProgramData\Microsoft\Windows Defender\Platform\4.18.26090.9-0\com.microsoft.defender.be.chrome.json
+      program: C:\ProgramData\Microsoft\Windows Defender\Platform\4.18.26090.9-0\mpextms.exe  [signature: Valid by CN=Microsoft Windows Publisher]
+      allowed extensions: chrome-extension://echcggldkblhodogklpincgchnpgcdco/, chrome-extension://lcmcgbabdcbngcbcfabdncmoppkajglo/, chrome-extension://nhepdlojobjcnniaggfkkgeekccgmaji/
+  * com.microsoft.browsercore   (HKCU:\SOFTWARE\Google\Chrome\NativeMessagingHosts)
+      manifest: C:\Windows\BrowserCore\manifest.json
+      program: C:\Windows\BrowserCore\BrowserCore.exe  [signature: Valid by CN=Microsoft Windows]
+      allowed extensions: chrome-extension://ppnbnpeolgkicgegkbkbjmhlideopiji/, chrome-extension://ndjpnladcallmjemlbaebfadecfhkepb/, chrome-extension://jfhehocgaajmfnaelknegmnnkgkemgcb/
+  * com.soundresearch.contentclassifier   (HKCU:\SOFTWARE\Google\Chrome\NativeMessagingHosts)
+      manifest: C:\Users\ddosn\AppData\Local\SoundResearch\NativeMessaging\com.soundresearch.contentclassifier.json
+      program: C:\WINDOWS\System32\SECCNH64.exe  [signature: Valid by CN=Microsoft Windows Hardware Compatibility Publisher]
+      allowed extensions: chrome-extension://mljihjcjekkjgdmfpjckdflejkebccap/, chrome-extension://fkhppjmkbifibialnglmjegmgckmkdco/, chrome-extension://iahgjpkfebmcdcaifedofgakoancmoli/, chrome-extension://glfiglflnbbpjednfhagamomjnkldadh/
+  * com.microsoft.browsercore   (HKLM:\SOFTWARE\Google\Chrome\NativeMessagingHosts)
+      manifest: C:\Windows\BrowserCore\manifest.json
+      program: C:\Windows\BrowserCore\BrowserCore.exe  [signature: Valid by CN=Microsoft Windows]
+      allowed extensions: chrome-extension://ppnbnpeolgkicgegkbkbjmhlideopiji/, chrome-extension://ndjpnladcallmjemlbaebfadecfhkepb/, chrome-extension://jfhehocgaajmfnaelknegmnnkgkemgcb/
+  * com.microsoft.defender.browser_extension.native_message_host   (HKLM:\SOFTWARE\Google\Chrome\NativeMessagingHosts)
+      manifest: C:\ProgramData\Microsoft\Windows Defender\Platform\4.18.26090.9-0\com.microsoft.defender.be.chrome.json
+      program: C:\ProgramData\Microsoft\Windows Defender\Platform\4.18.26090.9-0\mpextms.exe  [signature: Valid by CN=Microsoft Windows Publisher]
+      allowed extensions: chrome-extension://echcggldkblhodogklpincgchnpgcdco/, chrome-extension://lcmcgbabdcbngcbcfabdncmoppkajglo/, chrome-extension://nhepdlojobjcnniaggfkkgeekccgmaji/
+
+======================================================================
+  5. PROGRAMS THAT TOUCH EDGE (processes, startup, tasks, shortcuts)
+======================================================================
+  Running processes:
+    nothing suspicious
+  Startup entries:
+    nothing suspicious
+  Scheduled tasks:
+    nothing suspicious
+  Edge shortcuts with extra arguments:
+    nothing suspicious
+  System proxy:
+    no proxy
+
+======================================================================
+  6. FAVORITES FILES (contents not shown)
+======================================================================
+  Default\Bookmarks: 1527 favorites, 1,189,948 bytes, last changed 2026-10-03 20:41, last accessed 2026-10-03 20:41
+  Default\Bookmarks.bak: 1526 favorites, 1,189,087 bytes, last changed 2026-10-03 20:18, last accessed 2026-10-03 20:27
+  ("last accessed" is often not updated by Windows; use -EnableAudit to see real reads.)
+
+======================================================================
+  SUMMARY
+======================================================================
+  7 item(s) to review (marked [!] above).

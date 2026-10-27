@@ -13,7 +13,7 @@ test("offsets sit on the 1/32 grid within 6 sigma", () => {
 
 test("duration never overlaps the next step", () => {
   const b = schedulePattern(pat, "s");
-  b.hits.forEach(h => assert.ok(h.durationMs < b.stepMs));
+  b.hits.forEach((h) => assert.ok(h.durationMs < b.stepMs));
 });
 
 test("deterministic for same seed", () => {

@@ -9,7 +9,7 @@ export async function transcribeAudio(audio: Buffer, filename = "discord-audio.w
   const client = new OpenAI({ apiKey });
   const result = await client.audio.transcriptions.create({
     file: await toFile(audio, filename),
-    model: "whisper-1"
+    model: "whisper-1",
   });
   return result.text;
 }

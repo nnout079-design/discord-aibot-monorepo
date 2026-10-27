@@ -25,7 +25,11 @@ export interface SongFacts {
   year?: number;
 }
 
-const simplify = (text: string) => text.toLowerCase().replace(/\(.*?\)|\[.*?\]/g, "").replace(/[^a-z0-9]+/g, "");
+const simplify = (text: string) =>
+  text
+    .toLowerCase()
+    .replace(/\(.*?\)|\[.*?\]/g, "")
+    .replace(/[^a-z0-9]+/g, "");
 const num = (value: unknown, min: number, max: number) => {
   const n = Number(value);
   return Number.isFinite(n) && n >= min && n <= max ? n : undefined;
@@ -40,13 +44,16 @@ export function songFacts(result: GetSongResult): SongFacts {
     danceability: num(result.danceability, 0, 100),
     acousticness: num(result.acousticness, 0, 100),
     genres: result.artist?.genres?.length ? result.artist.genres : undefined,
-    year: num(result.album?.year, 1000, 3000)
+    year: num(result.album?.year, 1000, 3000),
   };
 }
 
 // Tempo, meter, key, danceability and acousticness from GetSongBPM (https://getsongbpm.com) when
 // GETSONGBPM_API_KEY is set; null if the key is missing or the song is unknown.
-export async function lookupSong(track: Pick<TrackAttributes, "artist" | "name">, fetchImpl: typeof fetch = fetch): Promise<SongFacts | null> {
+export async function lookupSong(
+  track: Pick<TrackAttributes, "artist" | "name">,
+  fetchImpl: typeof fetch = fetch
+): Promise<SongFacts | null> {
   const key = process.env.GETSONGBPM_API_KEY;
   if (!key) return null;
   const url = new URL(API_URL);
@@ -56,9 +63,12 @@ export async function lookupSong(track: Pick<TrackAttributes, "artist" | "name">
   try {
     const response = await fetchImpl(url, { headers: { "X-API-KEY": key }, signal: AbortSignal.timeout(4000) });
     if (!response.ok) return null;
-    const json = await response.json() as GetSongResult[] | { search?: GetSongResult[] | { error?: string } };
+    const json = (await response.json()) as GetSongResult[] | { search?: GetSongResult[] | { error?: string } };
     const results = Array.isArray(json) ? json : Array.isArray(json.search) ? json.search : [];
-    const exact = results.find(r => simplify(r.title ?? "") === simplify(track.name) && simplify(r.artist?.name ?? "") === simplify(track.artist));
+    const exact = results.find(
+      (r) =>
+        simplify(r.title ?? "") === simplify(track.name) && simplify(r.artist?.name ?? "") === simplify(track.artist)
+    );
     const best = exact ?? results[0];
     return best ? songFacts(best) : null;
   } catch {
@@ -66,6 +76,9 @@ export async function lookupSong(track: Pick<TrackAttributes, "artist" | "name">
   }
 }
 
-export async function lookupBpm(track: Pick<TrackAttributes, "artist" | "name">, fetchImpl: typeof fetch = fetch): Promise<number | null> {
+export async function lookupBpm(
+  track: Pick<TrackAttributes, "artist" | "name">,
+  fetchImpl: typeof fetch = fetch
+): Promise<number | null> {
   return (await lookupSong(track, fetchImpl))?.bpm ?? null;
 }

@@ -18,7 +18,11 @@ export class LightEngine {
   private show: LightShow | null = null;
   private timer: NodeJS.Timeout;
 
-  constructor(private config: LightsConfig, private out: DmxOutput, private now: () => number = Date.now) {
+  constructor(
+    private config: LightsConfig,
+    private out: DmxOutput,
+    private now: () => number = Date.now
+  ) {
     this.timer = setInterval(() => this.frame(), 1000 / (config.fps ?? 40));
   }
 

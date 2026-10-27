@@ -18,7 +18,7 @@ dotenv.config();
 
 type Track = NonNullable<SongEntryEvent["track"]>;
 const MODES = ["pro", "remaster", "video"] as const;
-type Mode = typeof MODES[number];
+type Mode = (typeof MODES)[number];
 
 export interface StudioArgs {
   command: "render" | "setup" | "reaper";
@@ -54,17 +54,22 @@ export function parseStudioArgs(argv: string[]): StudioArgs {
     else if (key === "style") args.allStyles = value === "all";
     else if (key === "ai") args.ai = value !== "0" && value !== "off";
     else if (key === "modes" || key === "studio") {
-      const modes = value.split(",").map(m => m.trim().toLowerCase());
-      const bad = modes.filter(m => !(MODES as readonly string[]).includes(m) && m !== "all");
+      const modes = value.split(",").map((m) => m.trim().toLowerCase());
+      const bad = modes.filter((m) => !(MODES as readonly string[]).includes(m) && m !== "all");
       if (bad.length) throw new Error(`Unknown studio "${bad.join(", ")}". Use pro, remaster, video or all`);
-      args.modes = new Set(modes.includes("all") ? MODES : modes as Mode[]);
+      args.modes = new Set(modes.includes("all") ? MODES : (modes as Mode[]));
     } else throw new Error(`Unknown option ${key}=`);
   }
-  for (const [name, value, min, max] of [["bpm", args.bpm, 40, 240], ["beats", args.beats, 2, 12]] as const) {
+  for (const [name, value, min, max] of [
+    ["bpm", args.bpm, 40, 240],
+    ["beats", args.beats, 2, 12],
+  ] as const) {
     if (value !== undefined && !(value >= min && value <= max)) throw new Error(`${name} must be ${min}-${max}`);
   }
   if (args.command === "render" && !args.username && !args.artist) {
-    throw new Error('Usage: npm run studio "song=Artist - Title" [studio=pro,remaster,video] [bpm=120]  or  npm run studio user=LASTFM_NAME');
+    throw new Error(
+      'Usage: npm run studio "song=Artist - Title" [studio=pro,remaster,video] [bpm=120]  or  npm run studio user=LASTFM_NAME'
+    );
   }
   return args;
 }
@@ -83,9 +88,9 @@ async function lookup(args: StudioArgs): Promise<{ track: Track; bpm: number | n
       method: "POST",
       headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
       body: JSON.stringify(args.username ? { username: args.username } : { artist: args.artist, title: args.title }),
-      signal: AbortSignal.timeout(15000)
+      signal: AbortSignal.timeout(15000),
     });
-    const json = await response.json() as { track?: Track; bpm?: number | null; lights?: LightPlan; error?: string };
+    const json = (await response.json()) as { track?: Track; bpm?: number | null; lights?: LightPlan; error?: string };
     if (!response.ok || !json.track) throw new Error(json.error ?? `bot returned ${response.status}`);
     return { track: json.track, bpm: json.bpm ?? null, lights: json.lights };
   } catch (error) {
@@ -102,23 +107,40 @@ export function songFacts(track: Track, source: string, bpm: number, sections: n
     track.key && `key ${track.key}`,
     track.year && String(track.year),
     track.album,
-    `${sections} sections`
-  ].filter(Boolean).join(" | ");
+    `${sections} sections`,
+  ]
+    .filter(Boolean)
+    .join(" | ");
 }
 
-const safe = (name: string) => name.replace(/[<>:"/\\|?*\x00-\x1f]/g, "_").replace(/\s+/g, " ").trim().slice(0, 120);
+const controlCharRegex = /[<>:"/\\|?*\x00-\x1f]/g;
+const safe = (name: string) => name.replace(controlCharRegex, "_").replace(/\s+/g, " ").trim().slice(0, 120);
 
 async function render(args: StudioArgs): Promise<void> {
   const rig = loadRig(process.env.RIG_FILE ?? "rig.json");
   const log = (message: string) => console.log(message);
-  const arranger = new Arranger(rig, { songsDir: process.env.SONGS_DIR ?? "songs", generate: true, allStyles: args.allStyles, log });
+  const arranger = new Arranger(rig, {
+    songsDir: process.env.SONGS_DIR ?? "songs",
+    generate: true,
+    allStyles: args.allStyles,
+    log,
+  });
   const { track, bpm: botBpm, lights } = await lookup(args);
   const title = `${track.artist} - ${track.name}`;
   const fileTempo = args.bpm === undefined ? arranger.tempoFor(track.artist, track.name, track.durationMs) : null;
   const bpm = args.bpm ?? fileTempo?.bpm ?? botBpm ?? 120;
   const beatsPerBar = args.beats ?? fileTempo?.beatsPerBar ?? track.timeSig ?? 4;
   const event: SongEntryEvent = {
-    type: "song-entry", sentAt: 0, countInAt: 0, startAt: 0, bpm, beatMs: 60000 / bpm, barMs: (60000 / bpm) * beatsPerBar, beatsPerBar, pattern: null, track
+    type: "song-entry",
+    sentAt: 0,
+    countInAt: 0,
+    startAt: 0,
+    bpm,
+    beatMs: 60000 / bpm,
+    barMs: (60000 / bpm) * beatsPerBar,
+    beatsPerBar,
+    pattern: null,
+    track,
   };
   const score = arranger.prepare(event);
   if (!score || score.notes.length === 0) throw new Error(`Nothing to play for ${title}`);
@@ -126,7 +148,9 @@ async function render(args: StudioArgs): Promise<void> {
   const dir = path.resolve(STUDIO_DIR, safe(title));
   const stemDir = path.join(dir, "stems");
   fs.mkdirSync(stemDir, { recursive: true });
-  console.log(`\n${title}: ${score.source}, ${bpm} BPM, ${score.sections.length} sections, ${(score.durationMs / 1000).toFixed(0)} s -> ${dir}`);
+  console.log(
+    `\n${title}: ${score.source}, ${bpm} BPM, ${score.sections.length} sections, ${(score.durationMs / 1000).toFixed(0)} s -> ${dir}`
+  );
 
   fs.writeFileSync(path.join(dir, "arrangement.mid"), scoreToMidi(score, rig, bpm));
   const stems: { name: string; path: string }[] = [];
@@ -140,7 +164,10 @@ async function render(args: StudioArgs): Promise<void> {
     stems.push({ name: group, path: wav });
   }
   const mix = path.join(dir, "mix.wav");
-  mixStems(stems.map(s => s.path), mix);
+  mixStems(
+    stems.map((s) => s.path),
+    mix
+  );
   console.log(`Mix: ${mix}`);
 
   let master: string | undefined;
@@ -148,33 +175,59 @@ async function render(args: StudioArgs): Promise<void> {
     master = path.join(dir, "master.wav");
     const before = remaster(mix, master, path.join(dir, "master.mp3"));
     const after = measure(master);
-    console.log(`Remaster: ${before.input_i} -> ${after.input_i} LUFS, true peak ${after.input_tp} dBTP (master.wav, master.mp3)`);
+    console.log(
+      `Remaster: ${before.input_i} -> ${after.input_i} LUFS, true peak ${after.input_tp} dBTP (master.wav, master.mp3)`
+    );
   }
   if (args.modes.has("pro")) {
     fs.writeFileSync(path.join(dir, "session.lua"), sessionScript(title, bpm, beatsPerBar, stems, master));
     console.log("Pro studio: arrangement.mid, stems/*.mid + *.wav, session.lua (Reaper: Actions > Load ReaScript)");
   }
   if (args.modes.has("video")) {
-    const labels = score.sections.map(s => rig.sections[s]?.label ?? s);
+    const labels = score.sections.map((s) => rig.sections[s]?.label ?? s);
     const art = path.join(dir, "cover.jpg");
-    const hasArt = fs.existsSync(art) || await downloadImage(track.imageUrl, art);
+    const hasArt = fs.existsSync(art) || (await downloadImage(track.imageUrl, art));
     let backdrop: string | null = hasArt ? art : null;
     if (args.ai) {
       try {
         const file = path.join(dir, "backdrop.png");
-        if (fs.existsSync(file) || await aiBackdrop(backdropPrompt(title, allTags(track), labels, track.summary), file, hasArt ? art : undefined)) backdrop = file;
+        if (
+          fs.existsSync(file) ||
+          (await aiBackdrop(
+            backdropPrompt(title, allTags(track), labels, track.summary),
+            file,
+            hasArt ? art : undefined
+          ))
+        )
+          backdrop = file;
         else console.log(`No OPENAI_API_KEY in .env: using ${hasArt ? "the album cover" : "a plain backdrop"}.`);
       } catch (error) {
-        console.log(`${error instanceof Error ? error.message : error}; using ${hasArt ? "the album cover" : "a plain backdrop"}.`);
+        console.log(
+          `${error instanceof Error ? error.message : error}; using ${hasArt ? "the album cover" : "a plain backdrop"}.`
+        );
       }
     }
     process.stdout.write("Rendering video ... ");
-    makeVideo(master ?? mix, backdrop, {
-      title,
-      subtitle: songFacts(track, score.source === "generated" ? "Generated arrangement" : `From ${score.source} MIDI`, bpm, score.sections.length),
-      bpm, beatsPerBar, durationMs: score.durationMs, entrances: entrances(rig, score),
-      palette: lights?.palette, energy: lights?.energy
-    }, path.join(dir, "video.mp4"));
+    makeVideo(
+      master ?? mix,
+      backdrop,
+      {
+        title,
+        subtitle: songFacts(
+          track,
+          score.source === "generated" ? "Generated arrangement" : `From ${score.source} MIDI`,
+          bpm,
+          score.sections.length
+        ),
+        bpm,
+        beatsPerBar,
+        durationMs: score.durationMs,
+        entrances: entrances(rig, score),
+        palette: lights?.palette,
+        energy: lights?.energy,
+      },
+      path.join(dir, "video.mp4")
+    );
     console.log(`done: ${path.join(dir, "video.mp4")}`);
   }
 }
@@ -186,14 +239,16 @@ async function main(): Promise<void> {
     const file = path.resolve(STUDIO_DIR, "LastFM Rig.lua");
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(file, liveRigScript(loadRig(process.env.RIG_FILE ?? "rig.json")));
-    console.log(`Wrote ${file}. In Reaper: Actions > Show action list > New action > Load ReaScript, pick it, then Run.`);
+    console.log(
+      `Wrote ${file}. In Reaper: Actions > Show action list > New action > Load ReaScript, pick it, then Run.`
+    );
     return;
   }
   await render(args);
 }
 
 if (require.main === module) {
-  main().catch(error => {
+  main().catch((error) => {
     console.error(error instanceof Error ? error.message : error);
     process.exit(1);
   });

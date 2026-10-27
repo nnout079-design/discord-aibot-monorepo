@@ -5,8 +5,8 @@ import { startVoiceTranscription, stopVoiceTranscription } from "../../streaming
 export const data = new SlashCommandBuilder()
   .setName("stream")
   .setDescription("Manage the Discord video companion stream")
-  .addSubcommand(command => command.setName("start").setDescription("Start companion frame ingestion"))
-  .addSubcommand(command => command.setName("stop").setDescription("Stop companion frame ingestion"));
+  .addSubcommand((command) => command.setName("start").setDescription("Start companion frame ingestion"))
+  .addSubcommand((command) => command.setName("stop").setDescription("Stop companion frame ingestion"));
 
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
   if (!isCoworker(interaction.user)) {
@@ -18,11 +18,16 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
   if (action === "start") {
     const voiceChannel = interaction.guild?.members.cache.get(interaction.user.id)?.voice.channel;
     if (!voiceChannel || !voiceChannel.isVoiceBased() || !interaction.channel?.isTextBased()) {
-      await interaction.reply({ content: "Join a voice channel and run this command in a text channel.", ephemeral: true });
+      await interaction.reply({
+        content: "Join a voice channel and run this command in a text channel.",
+        ephemeral: true,
+      });
       return;
     }
     startVoiceTranscription(voiceChannel, interaction.channel as TextChannel);
-    await interaction.reply("Voice transcription started. Companion video clients can POST authenticated frames to `/stream/frame`.");
+    await interaction.reply(
+      "Voice transcription started. Companion video clients can POST authenticated frames to `/stream/frame`."
+    );
     return;
   }
 

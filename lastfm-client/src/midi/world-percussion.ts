@@ -21,18 +21,18 @@ export const WORLD_PERCUSSION: PercussionInstrument[] = [
   { id: "darbuka", name: "Darbuka", region: "Middle East", midiNote: 63, defaultVelocity: 110 },
   { id: "taiko", name: "Taiko", region: "Japan", midiNote: 45, defaultVelocity: 120 },
   { id: "udu", name: "Udu", region: "West Africa", midiNote: 50, defaultVelocity: 100 },
-  { id: "shekere", name: "Shekere", region: "West Africa", midiNote: 54, defaultVelocity: 96 }
+  { id: "shekere", name: "Shekere", region: "West Africa", midiNote: 54, defaultVelocity: 96 },
 ];
 
 export const PERCUSSION_PATTERNS: Record<string, string[]> = {
   afrobeat: ["djembe", "shekere", "conga", "djembe"],
   tabla: ["tabla", "tabla", "tabla", "tabla"],
   darbuka: ["darbuka", "darbuka", "darbuka", "darbuka"],
-  taiko: ["taiko", "taiko", "taiko", "taiko"]
+  taiko: ["taiko", "taiko", "taiko", "taiko"],
 };
 
 export function findInstrument(id: string): PercussionInstrument | undefined {
-  return WORLD_PERCUSSION.find(instrument => instrument.id === id.toLowerCase());
+  return WORLD_PERCUSSION.find((instrument) => instrument.id === id.toLowerCase());
 }
 
 export function createHit(id: string, velocity?: number, durationMs = 180): PercussionHit | undefined {
@@ -42,6 +42,6 @@ export function createHit(id: string, velocity?: number, durationMs = 180): Perc
     instrument: instrument.id,
     note: instrument.midiNote,
     velocity: Math.max(1, Math.min(127, velocity ?? instrument.defaultVelocity)),
-    durationMs: Math.max(20, Math.min(5000, durationMs))
+    durationMs: Math.max(20, Math.min(5000, durationMs)),
   };
 }

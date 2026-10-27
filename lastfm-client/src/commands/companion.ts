@@ -9,10 +9,15 @@ export const data = new SlashCommandBuilder()
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
   const token = companionHub.token;
   if (!token) {
-    await interaction.reply({ content: "COMPANION_TOKEN is not set on the bot, so companions can't connect yet.", ephemeral: true });
+    await interaction.reply({
+      content: "COMPANION_TOKEN is not set on the bot, so companions can't connect yet.",
+      ephemeral: true,
+    });
     return;
   }
-  const botUrl = process.env.PUBLIC_URL ?? (process.env.FLY_APP_NAME ? `https://${process.env.FLY_APP_NAME}.fly.dev` : "http://localhost:8080");
+  const botUrl =
+    process.env.PUBLIC_URL ??
+    (process.env.FLY_APP_NAME ? `https://${process.env.FLY_APP_NAME}.fly.dev` : "http://localhost:8080");
   await interaction.reply({
     ephemeral: true,
     content: [
@@ -24,7 +29,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       `COMPANION_TOKEN=${token}`,
       "MIDI_OUTPUT=loopMIDI",
       "```",
-      "Then run `npm install` once and `npm start` in `lastfm-companion`. `npm run outputs` lists your MIDI outputs."
-    ].join("\n")
+      "Then run `npm install` once and `npm start` in `lastfm-companion`. `npm run outputs` lists your MIDI outputs.",
+    ].join("\n"),
   });
 }

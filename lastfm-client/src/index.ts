@@ -6,15 +6,19 @@ import * as syncCommand from './commands/sync';
 import * as companionCommand from './commands/companion';
 import * as wellnessCommand from './commands/wellness';
 import * as bertcaseCommand from './commands/bertcase';
+import * as progressCommand from './commands/progress';
+import { recordActivity } from './progress/tracker';
 import { companionHub } from './sync/companion-hub';
 import { companionControl } from './sync/session';
 dotenv.config();
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
-const commands = [percussionCommand.data, lastfmCommand.data, syncCommand.data, companionCommand.data, wellnessCommand.data, bertcaseCommand.data];
+const commands = [percussionCommand.data, lastfmCommand.data, syncCommand.data, companionCommand.data, wellnessCommand.data, bertcaseCommand.data, progressCommand.data];
+const LOUNGE_GUILD_ID = '505974446914535426';
 client.once('ready', async () => {
   console.log('✓ Bot ready');
   try {
     await Promise.all(commands.map(command => client.application?.commands.create(command)));
+    await Promise.all(commands.map(command => client.application?.commands.create(command, LOUNGE_GUILD_ID)));
     console.log('✓ Registered /percussion');
     console.log('✓ Registered /lastfm');
     console.log('✓ Registered /sync');
@@ -46,6 +50,11 @@ client.on('interactionCreate', async interaction => {
     if (interaction.commandName === bertcaseCommand.data.name) {
       await bertcaseCommand.execute(interaction);
     }
+    if (interaction.commandName === progressCommand.data.name) {
+      await progressCommand.execute(interaction);
+    }
+    const subcommand = interaction.options.getSubcommand(false) ?? '';
+    recordActivity(interaction.guildId ?? 'dm', interaction.user.id, interaction.commandName, subcommand);
   } catch (error) {
     console.error('Command failed:', error);
     const msg = { content: 'Command failed.', ephemeral: true };

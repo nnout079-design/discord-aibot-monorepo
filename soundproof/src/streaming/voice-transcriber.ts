@@ -1,4 +1,10 @@
-import { EndBehaviorType, VoiceConnection, VoiceReceiver, joinVoiceChannel, getVoiceConnection } from "@discordjs/voice";
+import {
+  EndBehaviorType,
+  VoiceConnection,
+  VoiceReceiver,
+  joinVoiceChannel,
+  getVoiceConnection,
+} from "@discordjs/voice";
 import { VoiceBasedChannel, TextChannel } from "discord.js";
 import prism from "prism-media";
 import { transcribeAudio } from "./whisper";
@@ -31,7 +37,7 @@ function subscribeToSpeaker(receiver: VoiceReceiver, userId: string, textChannel
   activeUsers.add(userId);
 
   const opusStream = receiver.subscribe(userId, {
-    end: { behavior: EndBehaviorType.AfterSilence, duration: 1000 }
+    end: { behavior: EndBehaviorType.AfterSilence, duration: 1000 },
   });
   const decoder = new prism.opus.Decoder({ rate: 48000, channels: 2, frameSize: 960 });
   const chunks: Buffer[] = [];
@@ -41,10 +47,7 @@ function subscribeToSpeaker(receiver: VoiceReceiver, userId: string, textChannel
     activeUsers.delete(userId);
     if (chunks.length === 0) return;
     const wav = pcmToWav(Buffer.concat(chunks));
-    const [transcriptResult, vehicleResult] = await Promise.allSettled([
-      transcribeAudio(wav),
-      detectVehicleNoise(wav)
-    ]);
+    const [transcriptResult, vehicleResult] = await Promise.allSettled([transcribeAudio(wav), detectVehicleNoise(wav)]);
     if (transcriptResult.status === "fulfilled" && transcriptResult.value.trim()) {
       await textChannel.send(`Whisper transcript <@${userId}>: ${transcriptResult.value}`);
     } else if (transcriptResult.status === "rejected") {
@@ -56,7 +59,7 @@ function subscribeToSpeaker(receiver: VoiceReceiver, userId: string, textChannel
         channelId: textChannel.id,
         source: "voice",
         userId,
-        result: vehicleResult.value
+        result: vehicleResult.value,
       });
     } else if (vehicleResult.status === "rejected") {
       console.error("Vehicle noise detection failed:", vehicleResult.reason);
@@ -68,10 +71,10 @@ export function startVoiceTranscription(channel: VoiceBasedChannel, textChannel:
   const connection = joinVoiceChannel({
     channelId: channel.id,
     guildId: channel.guild.id,
-    adapterCreator: channel.guild.voiceAdapterCreator
+    adapterCreator: channel.guild.voiceAdapterCreator,
   });
   activeConnections.set(channel.guild.id, connection);
-  connection.receiver.speaking.on("start", userId => subscribeToSpeaker(connection.receiver, userId, textChannel));
+  connection.receiver.speaking.on("start", (userId) => subscribeToSpeaker(connection.receiver, userId, textChannel));
 }
 
 export function stopVoiceTranscription(guildId: string): void {

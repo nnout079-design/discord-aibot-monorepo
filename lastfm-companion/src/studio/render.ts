@@ -9,7 +9,8 @@ export function renderMidi(midiPath: string, wavPath: string, gain = 0.5): void 
 
 // Sums the stems into one 32-bit float WAV, so nothing clips before mastering.
 export function mixStems(stems: string[], outPath: string): void {
-  const inputs = stems.flatMap(stem => ["-i", stem]);
-  const filter = stems.length > 1 ? ["-filter_complex", `amix=inputs=${stems.length}:normalize=0:dropout_transition=0`] : [];
+  const inputs = stems.flatMap((stem) => ["-i", stem]);
+  const filter =
+    stems.length > 1 ? ["-filter_complex", `amix=inputs=${stems.length}:normalize=0:dropout_transition=0`] : [];
   run("ffmpeg", ["-y", "-loglevel", "error", ...inputs, ...filter, "-c:a", "pcm_f32le", "-ar", "48000", outPath]);
 }

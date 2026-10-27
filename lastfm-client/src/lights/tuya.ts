@@ -8,7 +8,7 @@ const REGIONS: Record<string, string> = {
   us: "https://openapi.tuyaus.com",
   "us-east": "https://openapi-ueaz.tuyaus.com",
   cn: "https://openapi.tuyacn.com",
-  in: "https://openapi.tuyain.com"
+  in: "https://openapi.tuyain.com",
 };
 
 const sha256 = (text: string) => crypto.createHash("sha256").update(text).digest("hex");
@@ -30,7 +30,8 @@ export interface SignInput {
 // Tuya cloud request signature (HMAC-SHA256, upper-case hex).
 export function tuyaSign(input: SignInput): string {
   const stringToSign = [input.method, sha256(input.body), input.signedHeaders ?? "", input.url].join("\n");
-  return crypto.createHmac("sha256", input.secret)
+  return crypto
+    .createHmac("sha256", input.secret)
     .update(input.clientId + (input.accessToken ?? "") + input.t + input.nonce + stringToSign)
     .digest("hex")
     .toUpperCase();
@@ -59,7 +60,12 @@ const TOKEN_INVALID = 1010;
 export class TuyaClient {
   private token: { value: string; expiresAt: number } | null = null;
 
-  constructor(private clientId: string, private secret: string, private baseUrl: string, private fetchImpl: typeof fetch = fetch) {}
+  constructor(
+    private clientId: string,
+    private secret: string,
+    private baseUrl: string,
+    private fetchImpl: typeof fetch = fetch
+  ) {}
 
   static fromEnv(env = process.env): TuyaClient | null {
     const { TUYA_ACCESS_ID: id, TUYA_ACCESS_SECRET: secret } = env;
@@ -75,11 +81,31 @@ export class TuyaClient {
     const t = String(Date.now());
     const nonce = crypto.randomUUID().replace(/-/g, "");
     const accessToken = auth ? await this.accessToken() : undefined;
-    const headers: Record<string, string> = { client_id: this.clientId, t, nonce, sign_method: "HMAC-SHA256", "content-type": "application/json" };
+    const headers: Record<string, string> = {
+      client_id: this.clientId,
+      t,
+      nonce,
+      sign_method: "HMAC-SHA256",
+      "content-type": "application/json",
+    };
     if (accessToken) headers.access_token = accessToken;
-    headers.sign = tuyaSign({ clientId: this.clientId, secret: this.secret, t, nonce, method, url, body: text, accessToken });
-    const response = await this.fetchImpl(this.baseUrl + url, { method, headers, body: text || undefined, signal: AbortSignal.timeout(5000) });
-    const json = await response.json() as TuyaResponse<T>;
+    headers.sign = tuyaSign({
+      clientId: this.clientId,
+      secret: this.secret,
+      t,
+      nonce,
+      method,
+      url,
+      body: text,
+      accessToken,
+    });
+    const response = await this.fetchImpl(this.baseUrl + url, {
+      method,
+      headers,
+      body: text || undefined,
+      signal: AbortSignal.timeout(5000),
+    });
+    const json = (await response.json()) as TuyaResponse<T>;
     if (!json.success) {
       if (json.code === TOKEN_INVALID) this.token = null;
       throw new Error(`Tuya ${url.split("?")[0]}: ${json.msg ?? json.code ?? response.status}`);
@@ -89,13 +115,21 @@ export class TuyaClient {
 
   private async accessToken(): Promise<string> {
     if (this.token && this.token.expiresAt > Date.now() + 60_000) return this.token.value;
-    const result = await this.call<{ access_token: string; expire_time: number }>("GET", "/v1.0/token?grant_type=1", undefined, false);
+    const result = await this.call<{ access_token: string; expire_time: number }>(
+      "GET",
+      "/v1.0/token?grant_type=1",
+      undefined,
+      false
+    );
     this.token = { value: result.access_token, expiresAt: Date.now() + result.expire_time * 1000 };
     return result.access_token;
   }
 
   async functions(deviceId: string): Promise<TuyaFunction[]> {
-    const result = await this.call<{ functions: TuyaFunction[] }>("GET", `/v1.0/iot-03/devices/${encodeURIComponent(deviceId)}/functions`);
+    const result = await this.call<{ functions: TuyaFunction[] }>(
+      "GET",
+      `/v1.0/iot-03/devices/${encodeURIComponent(deviceId)}/functions`
+    );
     return result.functions ?? [];
   }
 
@@ -125,7 +159,7 @@ export interface GalaxyCodes {
 
 function values(fn: TuyaFunction | undefined): Record<string, unknown> {
   try {
-    return fn ? JSON.parse(fn.values) as Record<string, unknown> : {};
+    return fn ? (JSON.parse(fn.values) as Record<string, unknown>) : {};
   } catch {
     return {};
   }
@@ -138,17 +172,20 @@ function range(fn: TuyaFunction | undefined): Range | undefined {
 }
 
 export function galaxyCodes(functions: TuyaFunction[]): GalaxyCodes {
-  const byCode = new Map(functions.map(fn => [fn.code, fn]));
-  const has = (code: string) => byCode.has(code) ? code : undefined;
+  const byCode = new Map(functions.map((fn) => [fn.code, fn]));
+  const has = (code: string) => (byCode.has(code) ? code : undefined);
   const codes: GalaxyCodes = {
     power: has("switch_led"),
     nebula: has("colour_switch"),
     laser: has("laser_switch"),
     laserBright: range(byCode.get("laser_bright")),
     motor: has("fan_switch"),
-    motorSpeed: range(byCode.get("fan_speed"))
+    motorSpeed: range(byCode.get("fan_speed")),
   };
-  for (const [code, value] of [["work_mode", "colour"], ["star_work_mode", "manual"]]) {
+  for (const [code, value] of [
+    ["work_mode", "colour"],
+    ["star_work_mode", "manual"],
+  ]) {
     const modes = values(byCode.get(code)).range;
     if (Array.isArray(modes) && modes.includes(value)) {
       codes.mode = { code, value };
@@ -166,7 +203,7 @@ export function galaxyCodes(functions: TuyaFunction[]): GalaxyCodes {
 
 export function hexToHsv(hex: string): { h: number; s: number; v: number } {
   const n = parseInt(hex.replace("#", ""), 16);
-  const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map(c => c / 255);
+  const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((c) => c / 255);
   const max = Math.max(r, g, b);
   const d = max - Math.min(r, g, b);
   let h = 0;
@@ -187,7 +224,9 @@ const scale = (r: Range, x: number) => Math.round(r.min + (r.max - r.min) * Math
 
 export function galaxyCommands(codes: GalaxyCodes, state: GalaxyState): TuyaCommand[] {
   if (!state.on) {
-    return codes.power ? [{ code: codes.power, value: false }] : [codes.laser, codes.nebula].filter((c): c is string => !!c).map(code => ({ code, value: false }));
+    return codes.power
+      ? [{ code: codes.power, value: false }]
+      : [codes.laser, codes.nebula].filter((c): c is string => !!c).map((code) => ({ code, value: false }));
   }
   const level = state.level ?? 1;
   const commands: TuyaCommand[] = [];
@@ -196,12 +235,20 @@ export function galaxyCommands(codes: GalaxyCodes, state: GalaxyState): TuyaComm
   if (codes.nebula) commands.push({ code: codes.nebula, value: true });
   if (codes.colour && state.colour) {
     const hsv = hexToHsv(state.colour);
-    commands.push({ code: codes.colour.code, value: { h: hsv.h, s: Math.round(hsv.s * codes.colour.s), v: Math.max(1, Math.round(hsv.v * level * codes.colour.v)) } });
+    commands.push({
+      code: codes.colour.code,
+      value: {
+        h: hsv.h,
+        s: Math.round(hsv.s * codes.colour.s),
+        v: Math.max(1, Math.round(hsv.v * level * codes.colour.v)),
+      },
+    });
   }
   if (codes.laser) commands.push({ code: codes.laser, value: true });
   if (codes.laserBright) commands.push({ code: codes.laserBright.code, value: scale(codes.laserBright, level) });
   if (codes.motor) commands.push({ code: codes.motor, value: (state.speed ?? 0) > 0 });
-  if (codes.motorSpeed && state.speed !== undefined) commands.push({ code: codes.motorSpeed.code, value: scale(codes.motorSpeed, state.speed) });
+  if (codes.motorSpeed && state.speed !== undefined)
+    commands.push({ code: codes.motorSpeed.code, value: scale(codes.motorSpeed, state.speed) });
   return commands;
 }
 
@@ -220,9 +267,11 @@ export function projectorCues(plan: EntryPlan, lights: LightPlan, durationMs?: n
   const colour = (step: number, rig: number) => lights.palette[(step + rig) % lights.palette.length];
   const endAt = plan.startAt + Math.min(durationMs ?? MAX_SONG_MS, MAX_SONG_MS);
   const cues: ProjectorCue[] = [];
-  for (const rig of [0, 1]) cues.push({ at: plan.countInAt, rig, state: { on: true, colour: colour(0, rig), level: 0.3, speed: 0.15 } });
+  for (const rig of [0, 1])
+    cues.push({ at: plan.countInAt, rig, state: { on: true, colour: colour(0, rig), level: 0.3, speed: 0.15 } });
   for (let step = 0, at = plan.startAt; at < endAt; step++, at += plan.barMs * CUE_BARS) {
-    for (const rig of [0, 1]) cues.push({ at, rig, state: { on: true, colour: colour(step, rig), level: 1, speed: lights.energy } });
+    for (const rig of [0, 1])
+      cues.push({ at, rig, state: { on: true, colour: colour(step, rig), level: 1, speed: lights.energy } });
   }
   for (const rig of [0, 1]) cues.push({ at: endAt, rig, state: { on: false } });
   return cues;
@@ -234,11 +283,19 @@ export class GalaxyProjectors {
   private timers: NodeJS.Timeout[] = [];
   private codes = new Map<string, Promise<GalaxyCodes>>();
 
-  constructor(private client: TuyaClient, private devices: string[], private leadMs = 300, private log: (message: string) => void = console.log) {}
+  constructor(
+    private client: TuyaClient,
+    private devices: string[],
+    private leadMs = 300,
+    private log: (message: string) => void = console.log
+  ) {}
 
   static fromEnv(env = process.env): GalaxyProjectors | null {
     const client = TuyaClient.fromEnv(env);
-    const devices = (env.TUYA_DEVICE_IDS ?? "").split(",").map(id => id.trim()).filter(Boolean);
+    const devices = (env.TUYA_DEVICE_IDS ?? "")
+      .split(",")
+      .map((id) => id.trim())
+      .filter(Boolean);
     if (!client || devices.length === 0) return null;
     return new GalaxyProjectors(client, devices, Number(env.TUYA_LEAD_MS ?? 300));
   }
@@ -254,14 +311,16 @@ export class GalaxyProjectors {
   }
 
   private async apply(rig: number, state: GalaxyState): Promise<void> {
-    await Promise.all(this.devices.map(async (device, i) => {
-      if (i % 2 !== rig) return;
-      try {
-        await this.client.send(device, galaxyCommands(await this.codesFor(device), state));
-      } catch (error) {
-        this.log(`Galaxy projector ${device}: ${error instanceof Error ? error.message : String(error)}`);
-      }
-    }));
+    await Promise.all(
+      this.devices.map(async (device, i) => {
+        if (i % 2 !== rig) return;
+        try {
+          await this.client.send(device, galaxyCommands(await this.codesFor(device), state));
+        } catch (error) {
+          this.log(`Galaxy projector ${device}: ${error instanceof Error ? error.message : String(error)}`);
+        }
+      })
+    );
   }
 
   private clear(): void {
@@ -271,9 +330,11 @@ export class GalaxyProjectors {
 
   play(plan: EntryPlan, lights: LightPlan, durationMs?: number): void {
     this.clear();
-    this.devices.forEach(device => void this.codesFor(device).catch(() => {}));
+    this.devices.forEach((device) => void this.codesFor(device).catch(() => {}));
     for (const cue of projectorCues(plan, lights, durationMs)) {
-      this.timers.push(setTimeout(() => void this.apply(cue.rig, cue.state), Math.max(0, cue.at - this.leadMs - Date.now())));
+      this.timers.push(
+        setTimeout(() => void this.apply(cue.rig, cue.state), Math.max(0, cue.at - this.leadMs - Date.now()))
+      );
     }
   }
 

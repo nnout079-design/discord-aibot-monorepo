@@ -12,7 +12,7 @@ export interface StarCitizenStatus {
 
 function asPhase(value: unknown): GamePhase {
   const phase = String(value ?? "unknown").toLowerCase();
-  return ["lobby", "match", "victory", "defeat"].includes(phase) ? phase as GamePhase : "unknown";
+  return ["lobby", "match", "victory", "defeat"].includes(phase) ? (phase as GamePhase) : "unknown";
 }
 
 export async function fetchStarCitizenStatus(): Promise<StarCitizenStatus> {
@@ -23,11 +23,11 @@ export async function fetchStarCitizenStatus(): Promise<StarCitizenStatus> {
   }
 
   const response = await fetch(apiUrl, {
-    headers: { accept: "application/json", authorization: `Bearer ${apiKey}`, "x-api-key": apiKey }
+    headers: { accept: "application/json", authorization: `Bearer ${apiKey}`, "x-api-key": apiKey },
   });
   if (!response.ok) throw new Error(`Star Citizen API returned ${response.status}`);
 
-  const raw = await response.json() as Record<string, unknown>;
+  const raw = (await response.json()) as Record<string, unknown>;
   return {
     game: "star citizen",
     phase: asPhase(raw.phase ?? raw.state),
@@ -35,7 +35,7 @@ export async function fetchStarCitizenStatus(): Promise<StarCitizenStatus> {
     players: typeof raw.players === "number" ? raw.players : undefined,
     location: typeof raw.location === "string" ? raw.location : undefined,
     ship: typeof raw.ship === "string" ? raw.ship : undefined,
-    raw
+    raw,
   };
 }
 
@@ -52,6 +52,6 @@ export async function fetchStarCitizenTelemetry(guildId: string, channelId: stri
     event: status.event,
     players: status.players,
     analysis: details,
-    observedAt: new Date().toISOString()
+    observedAt: new Date().toISOString(),
   };
 }

@@ -27,10 +27,17 @@ test("same inputs within one bar give the same downbeat", () => {
 
 test("count-in clicks land on the beats before the downbeat, pattern starts on it", () => {
   const plan = planEntry(now, 8000, 137.5, 4);
-  const pattern = schedulePattern(["tabla", "conga"].map(instrument => ({ instrument, note: 60, velocity: 100, durationMs: 180 })), "s", 137.5).hits;
+  const pattern = schedulePattern(
+    ["tabla", "conga"].map((instrument) => ({ instrument, note: 60, velocity: 100, durationMs: 180 })),
+    "s",
+    137.5
+  ).hits;
   const hits = entryHits(plan, pattern);
-  const clicks = hits.filter(hit => hit.note === COUNT_IN_NOTE);
-  assert.deepEqual(clicks.map(hit => hit.offsetMs), [0, 1, 2, 3].map(i => i * plan.beatMs));
+  const clicks = hits.filter((hit) => hit.note === COUNT_IN_NOTE);
+  assert.deepEqual(
+    clicks.map((hit) => hit.offsetMs),
+    [0, 1, 2, 3].map((i) => i * plan.beatMs)
+  );
   const entry = hits.slice(clicks.length);
   entry.forEach((hit, i) => assert.equal(hit.offsetMs, plan.barMs + pattern[i].offsetMs));
 });

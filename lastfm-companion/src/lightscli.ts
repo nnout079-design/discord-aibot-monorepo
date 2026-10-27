@@ -25,7 +25,11 @@ async function main(): Promise<void> {
   }
   if (args.includes("ports")) {
     const ports = await dmxPorts();
-    console.log(ports.length ? ports.map(p => `${p.path}  ${p.label}${p.likely ? "  <- looks like a DMX adapter" : ""}`).join("\n") : "No serial/USB ports found.");
+    console.log(
+      ports.length
+        ? ports.map((p) => `${p.path}  ${p.label}${p.likely ? "  <- looks like a DMX adapter" : ""}`).join("\n")
+        : "No serial/USB ports found."
+    );
     return;
   }
   const config = loadLights(file);
@@ -33,9 +37,13 @@ async function main(): Promise<void> {
     console.log(`No ${file}. Run: npm run lights -- --write`);
     return;
   }
-  console.log(`Output: ${config.output}${config.output === "artnet" ? ` ${config.host} universe ${config.universe}` : config.port ? ` ${config.port}` : ""}`);
+  console.log(
+    `Output: ${config.output}${config.output === "artnet" ? ` ${config.host} universe ${config.universe}` : config.port ? ` ${config.port}` : ""}`
+  );
   for (const f of config.fixtures) {
-    console.log(`  ${f.name.padEnd(12)} rig ${f.rig === 0 ? "A" : "B"}  ${PROFILES[f.profile].label}, DMX ${f.address}-${f.address + PROFILES[f.profile].channels - 1}`);
+    console.log(
+      `  ${f.name.padEnd(12)} rig ${f.rig === 0 ? "A" : "B"}  ${PROFILES[f.profile].label}, DMX ${f.address}-${f.address + PROFILES[f.profile].channels - 1}`
+    );
   }
   if (!args.includes("test")) {
     console.log("\nnpm run lights test   plays an 8-bar demo on the rigs");
@@ -52,14 +60,20 @@ async function main(): Promise<void> {
   const startAt = countInAt + beatMs * 4;
   const endAt = startAt + beatMs * 4 * DEMO_BARS;
   const engine = new LightEngine(config, out);
-  engine.load(buildShow({ beatMs, beatsPerBar: 4, lights: { palette: GALAXY_PALETTE, energy: 0.8 } }, { countInAt, startAt, endAt }, [startAt, startAt + beatMs * 16]));
+  engine.load(
+    buildShow(
+      { beatMs, beatsPerBar: 4, lights: { palette: GALAXY_PALETTE, energy: 0.8 } },
+      { countInAt, startAt, endAt },
+      [startAt, startAt + beatMs * 16]
+    )
+  );
   console.log(`Demo on ${out.name}: count-in, then ${DEMO_BARS} bars at ${DEMO_BPM} BPM`);
-  await new Promise(resolve => setTimeout(resolve, endAt - Date.now() + 500));
+  await new Promise((resolve) => setTimeout(resolve, endAt - Date.now() + 500));
   engine.close();
   console.log("Done (blackout).");
 }
 
-main().catch(error => {
+main().catch((error) => {
   console.error(error instanceof Error ? error.message : error);
   process.exit(1);
 });

@@ -29,9 +29,7 @@ export function getGameState(guildId: string): GameState | undefined {
 
 export function normalizeTelemetry(input: Partial<GameTelemetry>): GameTelemetry | undefined {
   if (!input.guildId || !input.channelId || !input.game || !input.event) return undefined;
-  const phase = input.phase && ["lobby", "match", "victory", "defeat"].includes(input.phase)
-    ? input.phase
-    : "unknown";
+  const phase = input.phase && ["lobby", "match", "victory", "defeat"].includes(input.phase) ? input.phase : "unknown";
   return {
     guildId: input.guildId,
     channelId: input.channelId,
@@ -40,6 +38,6 @@ export function normalizeTelemetry(input: Partial<GameTelemetry>): GameTelemetry
     event: input.event.trim().toLowerCase(),
     players: input.players,
     analysis: input.analysis,
-    observedAt: input.observedAt ?? new Date().toISOString()
+    observedAt: input.observedAt ?? new Date().toISOString(),
   };
 }

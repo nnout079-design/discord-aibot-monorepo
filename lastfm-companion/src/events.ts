@@ -1,6 +1,6 @@
 export function createSseParser(onEvent: (type: string, data: string) => void): (chunk: string) => void {
   let buffer = "";
-  return chunk => {
+  return (chunk) => {
     buffer += chunk.replace(/\r/g, "");
     let end: number;
     while ((end = buffer.indexOf("\n\n")) >= 0) {
@@ -24,7 +24,7 @@ export function createSseParser(onEvent: (type: string, data: string) => void): 
 export class TokenRejectedError extends Error {}
 
 const STALE_MS = 45000;
-const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // Holds one outbound Server-Sent Events connection to the bot, reconnecting with backoff.
 export async function subscribe(
@@ -40,9 +40,12 @@ export async function subscribe(
     try {
       const response = await fetch(`${botUrl}/sync/events`, {
         headers: { authorization: `Bearer ${token}`, accept: "text/event-stream" },
-        signal: abort.signal
+        signal: abort.signal,
       });
-      if (response.status === 401) throw new TokenRejectedError("The bot rejected COMPANION_TOKEN. Run /companion in Discord for the current one.");
+      if (response.status === 401)
+        throw new TokenRejectedError(
+          "The bot rejected COMPANION_TOKEN. Run /companion in Discord for the current one."
+        );
       if (!response.ok || !response.body) throw new Error(`/sync/events returned ${response.status}`);
       log("Connected to bot, waiting for /sync");
       backoffMs = 1000;

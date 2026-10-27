@@ -2,7 +2,7 @@ import fs from "node:fs";
 import { FixtureConfig, PROFILES } from "./fixtures";
 
 export const OUTPUTS = ["open-dmx", "enttec-pro", "artnet", "log", "none"] as const;
-export type OutputKind = typeof OUTPUTS[number];
+export type OutputKind = (typeof OUTPUTS)[number];
 
 export interface LightsConfig {
   /** open-dmx (FTDI USB-DMX cables, Enttec Open DMX), enttec-pro (Enttec DMX USB Pro, DMXking), artnet (network node), log, none */
@@ -29,13 +29,14 @@ export const DEFAULT_LIGHTS: LightsConfig = {
   latencyMs: 0,
   fixtures: [
     { name: "Galaxy A", profile: "showtec-galaxy-360-18ch", address: 1, rig: 0, tiltRange: [0.3, 0.7] },
-    { name: "Galaxy B", profile: "showtec-galaxy-360-18ch", address: 19, rig: 1, tiltRange: [0.3, 0.7] }
-  ]
+    { name: "Galaxy B", profile: "showtec-galaxy-360-18ch", address: 19, rig: 1, tiltRange: [0.3, 0.7] },
+  ],
 };
 
 export function validateLights(config: LightsConfig): string[] {
   const errors: string[] = [];
-  if (!(OUTPUTS as readonly string[]).includes(config.output)) errors.push(`output must be one of ${OUTPUTS.join(", ")}`);
+  if (!(OUTPUTS as readonly string[]).includes(config.output))
+    errors.push(`output must be one of ${OUTPUTS.join(", ")}`);
   const used = new Map<number, string>();
   for (const fixture of config.fixtures) {
     const profile = PROFILES[fixture.profile];

@@ -2,16 +2,7 @@ import { ClaudeEngine } from "./engines/claude-adapter";
 
 export interface ReasoningResult {
   answer: string;
-  type:
-    | "math"
-    | "set"
-    | "logic"
-    | "probability"
-    | "statistics"
-    | "nlp"
-    | "graph"
-    | "claude"
-    | "unknown";
+  type: "math" | "set" | "logic" | "probability" | "statistics" | "nlp" | "graph" | "claude" | "unknown";
   confidence: number;
   verified: boolean;
   details?: any;
@@ -37,7 +28,7 @@ export class HybridReasoner {
       answer: "Unknown",
       type: "unknown",
       confidence: 0,
-      verified: false
+      verified: false,
     };
   }
 
@@ -49,7 +40,7 @@ export class HybridReasoner {
         type: "claude",
         confidence: response.confidence,
         verified: true,
-        details: { reasoning: response.reasoning }
+        details: { reasoning: response.reasoning },
       };
     } catch (error) {
       console.error("Claude reasoning failed:", error);
@@ -57,7 +48,7 @@ export class HybridReasoner {
         answer: "Error: Claude reasoning failed",
         type: "claude",
         confidence: 0,
-        verified: false
+        verified: false,
       };
     }
   }

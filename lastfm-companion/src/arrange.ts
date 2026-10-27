@@ -19,12 +19,18 @@ export function parseKey(key: string | undefined): { root: number; minor: boolea
   const m = key?.trim().match(/^([A-Ga-g])\s*([#♯b♭]?)\s*(m(?:in(?:or)?)?|maj(?:or)?)?\b/);
   if (!m) return null;
   const shift = m[2] === "#" || m[2] === "♯" ? 1 : m[2] === "b" || m[2] === "♭" ? -1 : 0;
-  return { root: (NOTE_NAMES[m[1].toUpperCase()] + shift + 12) % 12, minor: m[3] !== undefined && m[3].startsWith("m") && !m[3].startsWith("maj") };
+  return {
+    root: (NOTE_NAMES[m[1].toUpperCase()] + shift + 12) % 12,
+    minor: m[3] !== undefined && m[3].startsWith("m") && !m[3].startsWith("maj"),
+  };
 }
 
 function rng(seed: string): () => number {
   let h = 1779033703 ^ seed.length;
-  for (let i = 0; i < seed.length; i++) h = Math.imul(h ^ seed.charCodeAt(i), 3432918353), h = (h << 13) | (h >>> 19);
+  for (let i = 0; i < seed.length; i++) {
+    h = Math.imul(h ^ seed.charCodeAt(i), 3432918353);
+    h = (h << 13) | (h >>> 19);
+  }
   return () => {
     h = Math.imul(h ^ (h >>> 16), 2246822507);
     h = Math.imul(h ^ (h >>> 13), 3266489909);
@@ -61,9 +67,18 @@ export function generateSong(options: GenerateOptions): Song {
   const styles = stylesFor(options.tags);
   const text = options.tags.join(" ").toLowerCase();
   const key = parseKey(options.key);
-  const minor = key ? key.minor : styles.has("balkan") || /metal|dark|sad|goth|doom|emo|minor|melanchol|ambient|trap/.test(text);
+  const minor = key
+    ? key.minor
+    : styles.has("balkan") || /metal|dark|sad|goth|doom|emo|minor|melanchol|ambient|trap/.test(text);
   const scale = styles.has("balkan") && minor ? HARMONIC_MINOR : minor ? MINOR : MAJOR;
-  const progression = styles.has("balkan") && minor ? [0, 3, 4, 0] : styles.has("classical") ? [0, 3, 4, 0] : minor ? [0, 5, 2, 6] : [0, 4, 5, 3];
+  const progression =
+    styles.has("balkan") && minor
+      ? [0, 3, 4, 0]
+      : styles.has("classical")
+        ? [0, 3, 4, 0]
+        : minor
+          ? [0, 5, 2, 6]
+          : [0, 4, 5, 3];
   const randomRoot = Math.floor(random() * 12);
   const root = key ? key.root : randomRoot;
   const fourOnFloor = styles.has("electronic") || (options.danceability ?? 0) >= 70;
@@ -72,12 +87,14 @@ export function generateSong(options: GenerateOptions): Song {
   const totalBars = Math.max(12, Math.round(options.durationMs / barMs));
   const bars = form(totalBars);
 
-  const pitch = (degree: number, octave: number) => 12 * (octave + 1) + root + scale[((degree % 7) + 7) % 7] + 12 * Math.floor(degree / 7);
+  const pitch = (degree: number, octave: number) =>
+    12 * (octave + 1) + root + scale[((degree % 7) + 7) % 7] + 12 * Math.floor(degree / 7);
   const drums: PartNote[] = [];
   const bass: PartNote[] = [];
   const chords: PartNote[] = [];
   const melody: PartNote[] = [];
-  const hit = (list: PartNote[], note: number, velocity: number, timeMs: number, durationMs: number) => list.push({ note, velocity, timeMs, durationMs });
+  const hit = (list: PartNote[], note: number, velocity: number, timeMs: number, durationMs: number) =>
+    list.push({ note, velocity, timeMs, durationMs });
 
   const phrase = Array.from({ length: 4 }, () =>
     Array.from({ length: options.beatsPerBar * 2 }, () => (random() < 0.55 ? Math.floor(random() * 5) - 2 : null))
@@ -92,7 +109,7 @@ export function generateSong(options: GenerateOptions): Song {
     const nextBlock = bars[bar + 1];
 
     if (block === "outro") {
-      if (bar === bars.length - 2 || last) triad.forEach(n => hit(chords, n, 80, t, barMs));
+      if (bar === bars.length - 2 || last) triad.forEach((n) => hit(chords, n, 80, t, barMs));
       if (last) {
         hit(bass, pitch(0, 2), 110, t, barMs);
         hit(drums, 36, 120, t, 200);
@@ -103,14 +120,16 @@ export function generateSong(options: GenerateOptions): Song {
       return;
     }
 
-    triad.forEach(n => hit(chords, n, block === "intro" ? 60 : 75, t, barMs * 0.98));
+    triad.forEach((n) => hit(chords, n, block === "intro" ? 60 : 75, t, barMs * 0.98));
 
     if (block === "build" || block === "main") {
       const step = block === "main" ? beatMs / 2 : beatMs;
-      for (let at = 0; at < barMs - 1; at += step) hit(bass, pitch(degree, 2), block === "main" ? 100 : 85, t + at, step * 0.9);
+      for (let at = 0; at < barMs - 1; at += step)
+        hit(bass, pitch(degree, 2), block === "main" ? 100 : 85, t + at, step * 0.9);
       for (let beat = 0; beat < options.beatsPerBar; beat++) {
         const at = t + beat * beatMs;
-        if (fourOnFloor || beat === 0 || (block === "main" && beat === 2 && options.beatsPerBar % 2 === 0)) hit(drums, 36, beat === 0 ? 115 : 100, at, 100);
+        if (fourOnFloor || beat === 0 || (block === "main" && beat === 2 && options.beatsPerBar % 2 === 0))
+          hit(drums, 36, beat === 0 ? 115 : 100, at, 100);
         if (block === "main" && beat % 2 === 1) hit(drums, 38, 105, at, 100);
         if (block === "main") {
           hit(drums, 42, 80, at, 50);
@@ -140,7 +159,7 @@ export function generateSong(options: GenerateOptions): Song {
     { name: "drums", program: 0, drums: true, role: "drums", notes: drums },
     { name: "bass", program: 33, drums: false, role: "bass", notes: bass },
     { name: "chords", program: styles.has("classical") ? 19 : 48, drums: false, role: "chords", notes: chords },
-    { name: "melody", program: leadProgram, drums: false, role: "melody", notes: melody }
+    { name: "melody", program: leadProgram, drums: false, role: "melody", notes: melody },
   ];
   return { bpm: options.bpm, beatsPerBar: options.beatsPerBar, durationMs: totalBars * barMs, parts };
 }
