@@ -6,6 +6,7 @@ primary_region = 'iad'
 
 [env]
   NODE_ENV = 'production'
+  PROGRESS_DATA_PATH = '/app/data/progress.json'
   MENTAL_HEALTH_URL = 'https://discord-mental-health-service.fly.dev'
 
 [[vm]]
