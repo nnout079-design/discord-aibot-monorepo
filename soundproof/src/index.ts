@@ -22,8 +22,21 @@ startCompanionServer();
 const LOUNGE_GUILD_ID = '505974446914535426';
 client.once('ready', async () => {
 	console.log('✓ Bot ready');
-	await Promise.all(commands.map(command => client.application?.commands.create(command)));
-	await Promise.all(commands.map(command => client.application?.commands.create(command, LOUNGE_GUILD_ID)));
+	const registrationResults = await Promise.allSettled([
+		...commands.map(command => client.application?.commands.create(command)),
+		...commands.map(command => client.application?.commands.create(command, LOUNGE_GUILD_ID))
+	]);
+	const globalRegistrationFailures = registrationResults.slice(0, commands.length).filter(result => result.status === 'rejected');
+	const guildRegistrationFailures = registrationResults.slice(commands.length).filter(result => result.status === 'rejected');
+	const rejectionMessage = (reason: unknown) => reason instanceof Error ? reason.message : String(reason);
+	const firstGlobalFailure = globalRegistrationFailures[0];
+	if (firstGlobalFailure?.status === 'rejected') {
+		console.warn(`Command registration failed globally: ${rejectionMessage(firstGlobalFailure.reason)}`);
+	}
+	const firstGuildFailure = guildRegistrationFailures[0];
+	if (firstGuildFailure?.status === 'rejected') {
+		console.warn(`Command registration failed for guild ${LOUNGE_GUILD_ID}: ${rejectionMessage(firstGuildFailure.reason)}`);
+	}
 	console.log('✓ Registered /reason');
 	console.log('✓ Registered /bertcase');
 	console.log('✓ Registered /stream and /game');
