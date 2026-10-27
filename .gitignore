@@ -5,5 +5,9 @@ dist/
 .env.txt
 .env.sandbox
 .DS_Store
+.venv/
+__pycache__/
+*.py[cod]
+/nul
 
 separate sandbox box.txt
