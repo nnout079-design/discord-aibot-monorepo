@@ -70,6 +70,58 @@ const rules: GameRule[] = [
     cooldownSeconds: 60
   },
   {
+    id: "handball-world-grenade",
+    games: ["handball world"],
+    events: ["grenade", "throw"],
+    response: "Grenade throw detected. Watch the fuse — cook it too long and it goes off in hand.",
+    cooldownSeconds: 20
+  },
+  {
+    id: "handball-world-ranked-start",
+    games: ["handball world"],
+    phases: ["match"],
+    keywords: ["ranked"],
+    response: "Ranked Handball World match live. Read the keeper and save your long cooks for the last throws.",
+    cooldownSeconds: 60
+  },
+  {
+    id: "handball-world-victory",
+    games: ["handball world"],
+    phases: ["victory"],
+    response: "Handball World victory. Ranked points incoming.",
+    cooldownSeconds: 30
+  },
+  {
+    id: "stealth-shootout",
+    games: ["*"],
+    events: ["shootout", "firefight", "gunfight"],
+    response: "Shootout detected — get out of the light, break line of sight and run full camouflage in the shadows.",
+    cooldownSeconds: 45
+  },
+  {
+    id: "stealth-shoot-out-light",
+    games: ["*"],
+    events: ["stealth-plan"],
+    keywords: ["shoot out"],
+    response: "Stealth circuit: shooting out the light — relocate right after, the shot gives away your position.",
+    cooldownSeconds: 30
+  },
+  {
+    id: "stealth-high-exposure",
+    games: ["*"],
+    events: ["stealth-plan"],
+    keywords: ["risk high"],
+    response: "Stealth circuit: you're lit up and easy to target. Leave the light source and get into dark cover now.",
+    cooldownSeconds: 30
+  },
+  {
+    id: "stealth-plan",
+    games: ["*"],
+    events: ["stealth-plan"],
+    response: "Stealth circuit updated: stay out of light sources and hold full camouflage.",
+    cooldownSeconds: 60
+  },
+  {
     id: "vehicle-siren",
     games: ["*"],
     events: ["vehicle-noise"],

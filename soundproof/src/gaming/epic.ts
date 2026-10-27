@@ -18,6 +18,7 @@ export function detectGameFromText(text: string): string {
     normalized.includes("los santos")
   )
     return "grand theft auto v";
+  if (normalized.includes("handball")) return "handball world";
   return "unknown";
 }
 

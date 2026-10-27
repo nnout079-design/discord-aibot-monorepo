@@ -2,11 +2,13 @@ import express, { Request, Response } from "express";
 import OpenAI from "openai";
 import { Client, TextChannel } from "discord.js";
 import { detectGameFromText } from "../gaming/epic";
+import { getOrRefreshTuning } from "../gaming/changelog";
 import { normalizeTelemetry, updateGameState } from "../gaming/game-state";
 import { evaluateGameRules } from "../gaming/rules";
 import { fetchStarCitizenTelemetry } from "../gaming/star-citizen";
 import { analyzeDeath, getDiagnosticSummary, hashObservation, recordDiagnostic, recordDiagnosticFeedback, requestReaInvestigation } from "../gaming/diagnostics";
 import { sendPushbulletNote } from "../notifications/pushbullet";
+import { illuminationAt, LIT_THRESHOLD, parseStealthScene, recordStealthPlan, runStealthCircuit, updateLitTimer } from "../gaming/stealth-circuit";
 import { detectVehicleNoise } from "./audio-events-client";
 import { handleVehicleDetection } from "./vehicle-callback";
 
@@ -149,6 +151,60 @@ export function startCompanionServer(): void {
       }, `threat:${guildId}:${reaction.ruleId}`, 300_000)
       : undefined;
     response.status(202).json({ accepted: true, capturedAt: latestFrame.capturedAt, rule: reaction?.ruleId ?? null, evidenceId: evidence.id, ...(postmortem ? { postmortem } : {}), ...(notification ? { notification: notification.status } : {}), ...(threatNotification ? { threatNotification: threatNotification.status } : {}) });
+  });
+
+  app.post("/stream/stealth", async (request: Request, response: Response) => {
+    const expectedToken = process.env.STREAM_INGEST_TOKEN;
+    if (!expectedToken || request.header("x-stream-token") !== expectedToken) {
+      response.status(401).json({ error: "unauthorized" });
+      return;
+    }
+
+    const body = request.body && typeof request.body === "object" && !Array.isArray(request.body)
+      ? request.body as { guildId?: unknown; channelId?: unknown; game?: unknown; scene?: unknown }
+      : {};
+    const guildId = typeof body.guildId === "string" ? body.guildId : "";
+    const channelId = typeof body.channelId === "string" ? body.channelId : "";
+    const scene = parseStealthScene(body.scene);
+    if (!guildId || !channelId || !scene) {
+      response.status(400).json({ error: "guildId, channelId, and a valid scene are required" });
+      return;
+    }
+
+    const game = typeof body.game === "string" ? body.game.trim().toLowerCase() : "unknown";
+    const tuning = await getOrRefreshTuning(game);
+    if (scene.secondsLit === undefined) {
+      const lit = illuminationAt(scene.agent, scene.lights, scene.ambientLight ?? 0.1, tuning) >= LIT_THRESHOLD;
+      scene.secondsLit = updateLitTimer(`${guildId}:${scene.agent.id ?? "agent"}`, lit);
+    }
+    const plan = runStealthCircuit(scene, tuning);
+    recordStealthPlan(guildId, plan);
+    const state = updateGameState({
+      guildId,
+      channelId,
+      game,
+      phase: "match",
+      event: "stealth-plan",
+      analysis: `risk ${plan.risk} exposure ${plan.currentExposure}${plan.shootOut ? ` shoot out ${plan.shootOut.kind}` : ""}`,
+      observedAt: new Date().toISOString()
+    });
+    const reaction = evaluateGameRules(state);
+    if (reaction && discordClient) {
+      const channel = await discordClient.channels.fetch(reaction.channelId);
+      if (channel?.isTextBased()) await (channel as TextChannel).send(reaction.content);
+    }
+    response.json({
+      plan,
+      rule: reaction?.ruleId ?? null,
+      tuning: {
+        lightWeight: tuning.lightWeight,
+        camoMultiplier: tuning.camoMultiplier,
+        lightsShootable: tuning.lightsShootable ?? false,
+        shootOutAfterSeconds: tuning.shootOutAfterSeconds,
+        shotRevealRadius: tuning.shotRevealRadius,
+        sources: tuning.sources.length
+      }
+    });
   });
 
   app.post("/stream/audio", async (request: Request, response: Response) => {
