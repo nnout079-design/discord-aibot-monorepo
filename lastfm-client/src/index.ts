@@ -13,12 +13,14 @@ import { companionControl } from './sync/session';
 dotenv.config();
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 const commands = [percussionCommand.data, lastfmCommand.data, syncCommand.data, companionCommand.data, wellnessCommand.data, bertcaseCommand.data, progressCommand.data];
-const LOUNGE_GUILD_ID = '505974446914535426';
 client.once(Events.ClientReady, async () => {
+const LOUNGE_GUILD_ID = process.env.LOUNGE_GUILD_ID;
   console.log('✓ Bot ready');
   try {
     await Promise.all(commands.map(command => client.application?.commands.create(command)));
-    await Promise.all(commands.map(command => client.application?.commands.create(command, LOUNGE_GUILD_ID)));
+    if (LOUNGE_GUILD_ID) {
+      await Promise.all(commands.map(command => client.application?.commands.create(command, LOUNGE_GUILD_ID)));
+    }
     console.log('✓ Registered /percussion');
     console.log('✓ Registered /lastfm');
     console.log('✓ Registered /sync');

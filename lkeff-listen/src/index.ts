@@ -8,11 +8,17 @@ import { recordActivity } from './progress/tracker';
 dotenv.config();
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates] });
 const commands = [listenCommand.data, bertcaseCommand.data, progressCommand.data, wellnessCommand.data];
-const LOUNGE_GUILD_ID = '505974446914535426';
 client.once(Events.ClientReady, async () => {
+const LOUNGE_GUILD_ID = process.env.LOUNGE_GUILD_ID;
 	console.log('✓ Bot ready');
 	await Promise.all(commands.map(command => client.application?.commands.create(command)));
-	await Promise.all(commands.map(command => client.application?.commands.create(command, LOUNGE_GUILD_ID)));
+	if (LOUNGE_GUILD_ID) {
+		try {
+			await Promise.all(commands.map(command => client.application?.commands.create(command, LOUNGE_GUILD_ID)));
+		} catch (error) {
+			console.error(`Guild command registration skipped for ${LOUNGE_GUILD_ID}:`, error);
+		}
+	}
 	console.log('✓ Registered /listen');
 	console.log('✓ Registered /bertcase');
 });
