@@ -1,5 +1,5 @@
 ﻿import * as dotenv from 'dotenv';
-import { Client, GatewayIntentBits } from 'discord.js';
+import { Client, Events, GatewayIntentBits } from 'discord.js';
 import * as askCommand from './commands/reasoning/ask';
 import * as bertcaseCommand from './commands/bertcase';
 import * as streamCommand from './commands/streaming/stream';
@@ -18,7 +18,7 @@ attachVehicleCallbackClient(client);
 startCompanionServer();
 
 const LOUNGE_GUILD_ID = '505974446914535426';
-client.once('ready', async () => {
+client.once(Events.ClientReady, async () => {
 	console.log('✓ Bot ready');
 	await Promise.all(commands.map(command => client.application?.commands.create(command)));
 	await Promise.all(commands.map(command => client.application?.commands.create(command, LOUNGE_GUILD_ID)));

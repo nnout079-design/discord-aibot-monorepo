@@ -1,5 +1,5 @@
 ﻿import * as dotenv from 'dotenv';
-import { Client, GatewayIntentBits } from 'discord.js';
+import { Client, Events, GatewayIntentBits } from 'discord.js';
 import * as percussionCommand from './commands/percussion';
 import * as lastfmCommand from './commands/lastfm';
 import * as syncCommand from './commands/sync';
@@ -14,7 +14,7 @@ dotenv.config();
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 const commands = [percussionCommand.data, lastfmCommand.data, syncCommand.data, companionCommand.data, wellnessCommand.data, bertcaseCommand.data, progressCommand.data];
 const LOUNGE_GUILD_ID = '505974446914535426';
-client.once('ready', async () => {
+client.once(Events.ClientReady, async () => {
   console.log('✓ Bot ready');
   try {
     await Promise.all(commands.map(command => client.application?.commands.create(command)));

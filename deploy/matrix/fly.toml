@@ -1,0 +1,76 @@
+# Consolidated deployment: all bots + both LLM inference services on one
+# Fly performance machine (8 dedicated cores / 16 GB RAM).
+#
+# Deploy from the monorepo root:
+#   fly deploy --config deploy/matrix/fly.toml .
+#
+# One-time:  fly apps create discord-matrix
+#            fly volumes create matrix_data --region iad --size 10 -a discord-matrix
+# Secrets:   fly secrets set DISCORD_TOKEN=... OPENAI_API_KEY=... CLAUDE_API_KEY=... \
+#              LASTFM_API_KEY=... LASTFM_API_SECRET=... STREAM_INGEST_TOKEN=... \
+#              LOG_CHANNEL_ID=... SOCIALIZE_BOT_ID=... -a discord-matrix
+
+app = 'discord-matrix'
+primary_region = 'iad'
+
+[build]
+  dockerfile = 'deploy/matrix/Dockerfile'
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = 'off'
+  auto_start_machines = true
+  min_machines_running = 1
+
+[[http_service.checks]]
+  interval = '30s'
+  timeout = '10s'
+  grace_period = '60s'
+  method = 'GET'
+  path = '/health'
+  protocol = 'http'
+  tls_skip_verify = false
+
+[env]
+  NODE_ENV = 'production'
+  MATRIX_CPU_CORES = '8'
+  MATRIX_MEM_MB = '16384'
+  MATRIX_STATUS_PORT = '8090'
+
+  # LLM machine sets run in-container on loopback
+  MENTAL_HEALTH_URL = 'http://127.0.0.1:8000'
+  AUDIO_EVENTS_URL = 'http://127.0.0.1:8100'
+
+  # per-set resource profile consumed by soundproof's llm-awareness module
+  LLM_MH_CPUS = '4'
+  LLM_MH_MEM_MB = '4096'
+  LLM_AE_CPUS = '2'
+  LLM_AE_MEM_MB = '2048'
+
+  # inference service config
+  DEVICE = 'cpu'
+  MODEL_ID = 'MIT/ast-finetuned-audioset-10-10-0.4593'
+  VEHICLE_THRESHOLD = '0.4'
+  MAX_CLIP_SECONDS = '30'
+  VEHICLE_LABELS_PATH = '/app/services/audio-events/config/vehicle-labels.json'
+  MODEL_CATALOG_PATH = '/app/services/mental-health/config/models.yaml'
+  RESOURCES_PATH = '/app/services/mental-health/config/resources.json'
+  CRISIS_THRESHOLD = '0.5'
+  EMOTION_THRESHOLD = '0.5'
+  ANONYMIZE_USER_IDS = 'true'
+  MAX_INPUT_LENGTH = '4000'
+  HF_HOME = '/app/.cache/huggingface'
+  HF_HUB_DISABLE_SYMLINKS = '1'
+
+  LOUNGE_GUILD_ID = '505974446914535426'
+  PROGRESS_DATA_PATH = '/app/data/progress.json'
+
+[[vm]]
+  cpu_kind = 'performance'
+  cpus = 8
+  memory_mb = 16384
+
+[[mounts]]
+  source = 'matrix_data'
+  destination = '/app/data'

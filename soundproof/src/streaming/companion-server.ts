@@ -9,6 +9,7 @@ import { analyzeDeath, getDiagnosticSummary, hashObservation, recordDiagnostic, 
 import { sendPushbulletNote } from "../notifications/pushbullet";
 import { detectVehicleNoise } from "./audio-events-client";
 import { handleVehicleDetection } from "./vehicle-callback";
+import { getLlmStatus, isServiceHealthy, startLlmAwareness } from "./llm-awareness";
 
 export interface VideoFrame {
   guildId: string;
@@ -36,8 +37,58 @@ export function startCompanionServer(): void {
   const app = express();
   app.use(express.json({ limit: "8mb" }));
 
+  startLlmAwareness({
+    onTransition: transition => {
+      console.log(
+        `[llm-awareness] ${transition.service}: ${transition.from} -> ${transition.to}` +
+          (transition.detail ? ` (${transition.detail})` : ""),
+      );
+      const alertChannelId = process.env.LLM_ALERT_CHANNEL_ID;
+      if (discordClient && alertChannelId) {
+        void discordClient.channels
+          .fetch(alertChannelId)
+          .then(channel => {
+            if (channel?.isTextBased()) {
+              void (channel as TextChannel).send(
+                `LLM machine set **${transition.service}** is now **${transition.to.toUpperCase()}**` +
+                  (transition.detail ? ` — ${transition.detail}` : ""),
+              );
+            }
+          })
+          .catch(() => {});
+      }
+    },
+  });
+
   app.get("/health", (_request: Request, response: Response) => {
-    response.json({ ok: true, latestFrameAt: latestFrame?.capturedAt ?? null });
+    const sets = getLlmStatus();
+    response.json({
+      ok: true,
+      latestFrameAt: latestFrame?.capturedAt ?? null,
+      llm: {
+        configured: sets.filter(s => s.configured).length,
+        healthy: sets.filter(s => s.healthy).length,
+        sets: sets.map(s => ({
+          name: s.name,
+          configured: s.configured,
+          healthy: s.healthy,
+          latencyMs: s.latencyMs,
+        })),
+      },
+    });
+  });
+
+  app.get("/stream/llm-status", (request: Request, response: Response) => {
+    const expectedToken = process.env.STREAM_INGEST_TOKEN;
+    if (!expectedToken || request.header("x-stream-token") !== expectedToken) {
+      response.status(401).json({ error: "unauthorized" });
+      return;
+    }
+    const matrix = {
+      cpus: Number(process.env.MATRIX_CPU_CORES ?? 0) || null,
+      memoryMb: Number(process.env.MATRIX_MEM_MB ?? 0) || null,
+    };
+    response.json({ matrix, sets: getLlmStatus() });
   });
 
   app.get("/stream/star-citizen/status", async (request: Request, response: Response) => {
@@ -166,6 +217,11 @@ export function startCompanionServer(): void {
 
     const startedAt = Date.now();
     const contentHash = hashObservation(audioBase64);
+    if (process.env.AUDIO_EVENTS_URL && !isServiceHealthy("audio-events")) {
+      const evidence = recordDiagnostic({ guildId, channelId, game: game ?? "unknown", source: "audio", stage: "audio", outcome: "failed", latencyMs: 0, contentHash, detail: "audio-events machine set reported down by llm-awareness" });
+      response.status(503).json({ error: "audio-events machine set is down", evidenceId: evidence.id });
+      return;
+    }
     try {
       const result = await detectVehicleNoise(Buffer.from(audioBase64, "base64"));
       if (!result) {

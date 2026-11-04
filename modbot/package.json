@@ -1,0 +1,21 @@
+{
+  "name": "modbot",
+  "version": "1.0.0",
+  "description": "Moderation bot: offence scanning + .quote output analysis",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "ts-node src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "setup:automod": "node dist/setup-automod.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.13.0",
+    "dotenv": "^18.0.9"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^7.0.2"
+  }
+}

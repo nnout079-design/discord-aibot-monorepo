@@ -232,3 +232,132 @@ MENTAL_HEALTH_URL=https://discord-mental-health-service.fly.dev
 ```
 
 Each `fly.toml` sets this default. Update it if you choose a different app name.
+
+# Agent Notes: Moderation Bot (modbot)
+
+## What changed
+
+- Added a `modbot/` package: message-scanning moderation bot for the
+  Socialize / Visible Vapor server.
+  - `src/scanner.ts` — leetspeak/diacritic normalization + offence tiers:
+    CRITICAL (minor/sexual refs) -> delete + 1h timeout; HIGH (slurs,
+    "gay" as insult) -> delete + warn, 2nd -> 10m timeout; MEDIUM
+    (profanity + bypasses like "fonk", middle-finger emoji) -> delete +
+    warn, 3rd -> 10m timeout; LOW (begging, mod disrespect) -> flag only.
+  - `src/index.ts` — `messageCreate` handler. Members with
+    ManageMessages/Admin are exempt. Warn counts are in-memory (reset
+    on restart).
+  - `.quote` analysis: invocations of `.q`/`.quote`/`!quote` are tracked
+    per channel; output posted by `SOCIALIZE_BOT_ID` is re-scanned since
+    AutoMod cannot filter bot messages. Flagged quote output is deleted
+    and the recent invoker is held responsible.
+  - `src/setup-automod.ts` — one-time `npm run setup:automod` creates
+    the 8 AutoMod rules (keyword, regex, presets, mention-spam, spam).
+    Idempotent: skips rules that already exist by name.
+- `docker-compose.yml` — `modbot` service on discord-network, no DB deps.
+- `.env.example` — MODBOT_DISCORD_TOKEN, MODBOT_GUILD_ID,
+  MODBOT_LOG_CHANNEL_ID, SOCIALIZE_BOT_ID.
+
+## Environment variables
+
+```env
+DISCORD_TOKEN=<modbot token>        # MODBOT_DISCORD_TOKEN in compose
+GUILD_ID=<Visible Vapor guild id>   # only needed for setup:automod
+LOG_CHANNEL_ID=<mod-log channel>
+SOCIALIZE_BOT_ID=<Socialize Fun bot user id>
+```
+
+## Required Discord setup
+
+- Enable the **Message Content** privileged intent in the dev portal.
+- Bot role needs Manage Messages, Moderate Members, Send Messages
+  (+ Manage Server for `setup:automod`).
+
+## Running
+
+```bash
+cd modbot
+cp .env.example .env   # fill in values
+npm install && npm run build
+npm run setup:automod  # one-time AutoMod rules
+npm start
+```
+
+# Agent Notes: Matrix Consolidated Deployment + LLM Awareness
+
+## What changed
+
+- `deploy/matrix/` — single-machine Fly deployment ("matrix"):
+  - `Dockerfile` — multi-stage: builds all six TS bots, then a
+    node:20-bookworm-slim + python3.11 image with one shared venv for
+    both inference services (CPU torch wheels).
+  - `run.mjs` — process supervisor. Spawns each bot and uvicorn service,
+    restarts crashes with capped exponential backoff, forwards SIGTERM,
+    exposes `GET http://127.0.0.1:8090/matrix-status`.
+  - `fly.toml` — `discord-matrix` app on `cpu_kind='performance',
+    cpus=8, memory_mb=16384`, `matrix_data` volume at /app/data.
+    Public ingress -> soundproof companion server on :3000.
+  - Budget: mental-health 4c/4G, audio-events 2c/2G, soundproof 1.5G,
+    discord-aibot/lastfm 768M, lkeff-listen/airhornbot/modbot 384M.
+
+- `soundproof/src/streaming/llm-awareness.ts` — LLM machine-set registry.
+  - Polls MENTAL_HEALTH_URL + AUDIO_EVENTS_URL `/health` every 30s.
+  - `/health` now reports `llm.sets` (configured/healthy/latency).
+  - `GET /stream/llm-status` (x-stream-token) returns the full registry
+    incl. per-set cpu/mem profile and the MATRIX_CPU_CORES/MEM_MB totals.
+  - State transitions (up<->down) log to console and post to
+    `LLM_ALERT_CHANNEL_ID` when set.
+  - `/stream/audio` fast-fails 503 while the audio-events set is down.
+
+- Dependencies: discord.js ^14.13 -> 14.28.1 everywhere, pg 8.23.1,
+  express 5.3.0. Majors left alone (anthropic sdk 1.x, ioredis 6,
+  openai 7, dotenv 18, @types/node 26, typescript 7) — bump deliberately.
+
+## Deploying the matrix
+
+```bash
+fly apps create discord-matrix
+fly volumes create matrix_data --region iad --size 10 -a discord-matrix
+fly secrets set DISCORD_TOKEN=... OPENAI_API_KEY=... CLAUDE_API_KEY=... \
+  LASTFM_API_KEY=... LASTFM_API_SECRET=... STREAM_INGEST_TOKEN=... \
+  LOG_CHANNEL_ID=... SOCIALIZE_BOT_ID=... -a discord-matrix
+fly deploy --config deploy/matrix/fly.toml .
+```
+
+Databases (postgres/redis/mongo) and prometheus/grafana stay as
+separate services — point DATABASE_URL/REDIS_URL/MONGO_URL at them via
+secrets if bots need them.
+
+# Agent Notes: Docker Hardening (16 GB host budget)
+
+Applied to `docker-compose.yml`:
+
+- Global `x-app-logging` anchor: json-file, 10 MB x 3 files per container.
+- `HF_HUB_DISABLE_SYMLINKS=1` on mental-health + audio-events; HF caches
+  live on named volumes (`mental_health_cache`, `audio_events_cache`).
+- `tmpfs` /tmp (100M) on the python inference services.
+- Healthchecks on every service; mental-health/audio-events also fail
+  above ~90% of their memory limit (cgroup read) so autoheal restarts
+  them before the kernel OOM-killer.
+- `autoheal` service (willfarrell/autoheal) restarts any container marked
+  unhealthy — Docker alone does not restart on healthcheck failure.
+- mental-health adapters load with `low_cpu_mem_usage=True` (needs
+  `accelerate`, added to requirements.txt).
+
+## Host-level: sysctl (not settable per-container)
+
+`vm.*` sysctls are host-kernel parameters — the compose `sysctls:` key
+only accepts namespaced params (net.* etc). On a dedicated Linux host
+for the 16 GB box, add to /etc/sysctl.d/99-discord.conf:
+
+```conf
+vm.swappiness=10          # prefer page-cache reclaim over swap
+vm.dirty_ratio=15         # cap dirty page cache (% of RAM)
+vm.dirty_background_ratio=5
+vm.overcommit_memory=1    # python/node allocators overcommit heavily
+```
+
+then `sysctl --system`. On Docker Desktop for Windows these apply to
+the WSL VM (`wsl -d docker-desktop`); on Fly.io the host is managed —
+the equivalent controls are the machine size and swap volumes
+(`fly machine update --swap-size` is not supported; keep RAM budgeted).

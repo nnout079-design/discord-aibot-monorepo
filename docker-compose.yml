@@ -1,4 +1,12 @@
-﻿services:
+# Global log rotation: keep at most 3x10MB of json-file logs per container so
+# chatty services cannot eat OS page cache / disk over time.
+x-app-logging: &app-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
   # Database Services
   postgres:
     image: postgres:16-alpine
@@ -12,6 +20,7 @@
     ports:
       - "127.0.0.1:5432:5432"
     restart: unless-stopped
+    logging: *app-logging
     security_opt:
       - no-new-privileges:true
     healthcheck:
@@ -39,6 +48,7 @@
     volumes:
       - redis_data:/data
     restart: unless-stopped
+    logging: *app-logging
     security_opt:
       - no-new-privileges:true
     healthcheck:
@@ -68,13 +78,14 @@
     ports:
       - "127.0.0.1:27017:27017"
     restart: unless-stopped
+    logging: *app-logging
     security_opt:
       - no-new-privileges:true
     healthcheck:
       test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
       interval: 30s
-      timeout: 15s
-      start_period: 30s
+      timeout: 20s
+      start_period: 60s
       retries: 5
     deploy:
       resources:
@@ -115,12 +126,19 @@
       mongo:
         condition: service_healthy
     restart: unless-stopped
+    logging: *app-logging
     security_opt:
       - no-new-privileges:true
       - apparmor:docker-default
     read_only: true
     tmpfs:
       - /tmp
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:3000/health || exit 1"]
+      interval: 60s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
     deploy:
       resources:
         limits:
@@ -152,12 +170,19 @@
       mongo:
         condition: service_healthy
     restart: unless-stopped
+    logging: *app-logging
     security_opt:
       - no-new-privileges:true
       - apparmor:docker-default
     read_only: true
     tmpfs:
       - /tmp
+    healthcheck:
+      test: ["CMD-SHELL", "pidof node >/dev/null 2>&1 || ps | grep -q dist/index || exit 1"]
+      interval: 60s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
     deploy:
       resources:
         limits:
@@ -189,12 +214,19 @@
       mongo:
         condition: service_healthy
     restart: unless-stopped
+    logging: *app-logging
     security_opt:
       - no-new-privileges:true
       - apparmor:docker-default
     read_only: true
     tmpfs:
       - /tmp
+    healthcheck:
+      test: ["CMD-SHELL", "pidof node >/dev/null 2>&1 || ps | grep -q dist/index || exit 1"]
+      interval: 60s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
     deploy:
       resources:
         limits:
@@ -227,12 +259,19 @@
       mongo:
         condition: service_healthy
     restart: unless-stopped
+    logging: *app-logging
     security_opt:
       - no-new-privileges:true
       - apparmor:docker-default
     read_only: true
     tmpfs:
       - /tmp
+    healthcheck:
+      test: ["CMD-SHELL", "pidof node >/dev/null 2>&1 || ps | grep -q dist/index || exit 1"]
+      interval: 60s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
     deploy:
       resources:
         limits:
@@ -269,12 +308,19 @@
       mongo:
         condition: service_healthy
     restart: unless-stopped
+    logging: *app-logging
     security_opt:
       - no-new-privileges:true
       - apparmor:docker-default
     read_only: true
     tmpfs:
       - /tmp
+    healthcheck:
+      test: ["CMD-SHELL", "pidof node >/dev/null 2>&1 || ps | grep -q dist/index || exit 1"]
+      interval: 60s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
     deploy:
       resources:
         limits:
@@ -287,6 +333,42 @@
       - discord-network
       - database-network
 
+  # Moderation bot: offence scanning + .quote output analysis.
+  # Uses its own token (MODBOT_DISCORD_TOKEN) and needs Manage Messages,
+  # Moderate Members, and the Message Content privileged intent.
+  modbot:
+    image: discord-bot-modbot:latest
+    container_name: modbot
+    build: ./modbot
+    environment:
+      - DISCORD_TOKEN=${MODBOT_DISCORD_TOKEN:-${DISCORD_TOKEN}}
+      - SOCIALIZE_BOT_ID=${SOCIALIZE_BOT_ID}
+      - GUILD_ID=${MODBOT_GUILD_ID}
+    restart: unless-stopped
+    logging: *app-logging
+    security_opt:
+      - no-new-privileges:true
+      - apparmor:docker-default
+    read_only: true
+    tmpfs:
+      - /tmp
+    healthcheck:
+      test: ["CMD-SHELL", "pidof node >/dev/null 2>&1 || ps | grep -q dist/index || exit 1"]
+      interval: 60s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+    networks:
+      - discord-network
+
   # Mental Health Inference Service
   mental-health:
     image: discord-mental-health-service:latest
@@ -296,6 +378,7 @@
       - "127.0.0.1:8000:8000"
     environment:
       - HF_HOME=/app/.cache/huggingface
+      - HF_HUB_DISABLE_SYMLINKS=1
       - MODEL_CATALOG_PATH=/app/config/models.yaml
       - RESOURCES_PATH=/app/config/resources.json
       - CRISIS_THRESHOLD=0.5
@@ -304,9 +387,20 @@
       - USE_ONNX=false
     volumes:
       - mental_health_cache:/app/.cache/huggingface
+    tmpfs:
+      - /tmp:size=100M,mode=1777
     restart: unless-stopped
+    logging: *app-logging
     security_opt:
       - no-new-privileges:true
+    healthcheck:
+      # HTTP health + restart-before-OOM: fails above ~90% of the 4G limit so
+      # autoheal restarts the container before the kernel OOM-killer does.
+      test: ["CMD-SHELL", "MEM=$$(cat /sys/fs/cgroup/memory.current 2>/dev/null || cat /sys/fs/cgroup/memory/memory.usage_in_bytes); [ $$MEM -lt 3700000000 ] && python -c \"import urllib.request,sys;sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health',timeout=5).status==200 else 1)\""]
+      interval: 30s
+      timeout: 10s
+      start_period: 120s
+      retries: 3
     deploy:
       resources:
         limits:
@@ -314,7 +408,7 @@
           memory: 4G
         reservations:
           cpus: '1.0'
-          memory: 2G
+          memory: 3.5G
     networks:
       - discord-network
 
@@ -327,6 +421,7 @@
       - "127.0.0.1:8100:8100"
     environment:
       - HF_HOME=/app/.cache/huggingface
+      - HF_HUB_DISABLE_SYMLINKS=1
       - MODEL_ID=MIT/ast-finetuned-audioset-10-10-0.4593
       - VEHICLE_LABELS_PATH=/app/config/vehicle-labels.json
       - VEHICLE_THRESHOLD=0.4
@@ -334,9 +429,18 @@
       - DEVICE=cpu
     volumes:
       - audio_events_cache:/app/.cache/huggingface
+    tmpfs:
+      - /tmp:size=100M,mode=1777
     restart: unless-stopped
+    logging: *app-logging
     security_opt:
       - no-new-privileges:true
+    healthcheck:
+      test: ["CMD-SHELL", "MEM=$$(cat /sys/fs/cgroup/memory.current 2>/dev/null || cat /sys/fs/cgroup/memory/memory.usage_in_bytes); [ $$MEM -lt 1800000000 ] && python -c \"import urllib.request,sys;sys.exit(0 if urllib.request.urlopen('http://localhost:8100/health',timeout=5).status==200 else 1)\""]
+      interval: 30s
+      timeout: 10s
+      start_period: 120s
+      retries: 3
     deploy:
       resources:
         limits:
@@ -363,6 +467,7 @@
       - '--web.console.libraries=/usr/share/prometheus/console_libraries'
       - '--web.console.templates=/usr/share/prometheus/consoles'
     restart: unless-stopped
+    logging: *app-logging
     security_opt:
       - no-new-privileges:true
     read_only: true
@@ -392,6 +497,7 @@
     depends_on:
       - prometheus
     restart: unless-stopped
+    logging: *app-logging
     security_opt:
       - no-new-privileges:true
     deploy:
@@ -405,6 +511,58 @@
     networks:
       - monitoring-network
 
+  # Optional local generative LLM (opt-in via profile). Models live on the
+  # ollama_data volume; pull a small one, e.g. `docker exec discord-ollama
+  # ollama pull llama3.2:1b` (~1.3 GB RAM) or llama3.2:3b (~2.2 GB). 4 GB cap.
+  ollama:
+    profiles: ["ollama"]
+    image: ollama/ollama:latest
+    container_name: discord-ollama
+    ports:
+      - "127.0.0.1:11434:11434"
+    environment:
+      - OLLAMA_NUM_PARALLEL=1
+      - OLLAMA_MAX_LOADED_MODELS=1
+    volumes:
+      - ollama_data:/root/.ollama
+    tmpfs:
+      - /tmp:size=100M,mode=1777
+    restart: unless-stopped
+    logging: *app-logging
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list >/dev/null 2>&1 || exit 1"]
+      interval: 60s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+        reservations:
+          cpus: '1.0'
+          memory: 3.5G
+    networks:
+      - discord-network
+
+  # Restarts containers whose healthcheck reports unhealthy. Docker itself
+  # only marks the state; autoheal performs the actual restart.
+  autoheal:
+    image: willfarrell/autoheal:latest
+    container_name: discord-autoheal
+    environment:
+      - AUTOHEAL_CONTAINER_LABEL=all
+      - AUTOHEAL_INTERVAL=60
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+    logging: *app-logging
+    networks:
+      - discord-network
+
 volumes:
   postgres_data:
   redis_data:
@@ -413,6 +571,7 @@ volumes:
   audio_events_cache:
   prometheus_data:
   grafana_data:
+  ollama_data:
 
 networks:
   discord-network:

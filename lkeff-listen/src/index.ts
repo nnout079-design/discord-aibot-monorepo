@@ -1,5 +1,5 @@
 ﻿import * as dotenv from 'dotenv';
-import { Client, GatewayIntentBits } from 'discord.js';
+import { Client, Events, GatewayIntentBits } from 'discord.js';
 import * as listenCommand from './commands/listen';
 import * as bertcaseCommand from './commands/bertcase';
 import * as progressCommand from './commands/progress';
@@ -9,7 +9,7 @@ dotenv.config();
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates] });
 const commands = [listenCommand.data, bertcaseCommand.data, progressCommand.data, wellnessCommand.data];
 const LOUNGE_GUILD_ID = '505974446914535426';
-client.once('ready', async () => {
+client.once(Events.ClientReady, async () => {
 	console.log('✓ Bot ready');
 	await Promise.all(commands.map(command => client.application?.commands.create(command)));
 	await Promise.all(commands.map(command => client.application?.commands.create(command, LOUNGE_GUILD_ID)));

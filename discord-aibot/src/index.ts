@@ -1,5 +1,5 @@
 ﻿import * as dotenv from 'dotenv';
-import { Client, GatewayIntentBits } from 'discord.js';
+import { Client, Events, GatewayIntentBits } from 'discord.js';
 import * as artifactCommand from './commands/artifact';
 import * as askCommand from './commands/ask';
 import * as bertcaseCommand from './commands/bertcase';
@@ -13,7 +13,7 @@ startAnalysisServer();
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 const commands = [artifactCommand.data, askCommand.data, bertcaseCommand.data, helpCommand.data, progressCommand.data, wellnessCommand.data];
 const LOUNGE_GUILD_ID = process.env.LOUNGE_GUILD_ID;
-client.once('ready', async () => {
+client.once(Events.ClientReady, async () => {
 	console.log('✓ Bot ready');
 	await Promise.all(commands.map(command => client.application?.commands.create(command)));
 	if (LOUNGE_GUILD_ID) {

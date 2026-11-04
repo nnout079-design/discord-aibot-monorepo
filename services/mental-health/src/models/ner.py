@@ -31,7 +31,7 @@ class NERAdapter(BaseModelAdapter):
                 self.model_id,
                 torch_dtype=torch.float32,
                 trust_remote_code=True,
-                low_cpu_mem_usage=False,
+                low_cpu_mem_usage=True,
                 **kwargs,
             )
             model.to(self.device)
