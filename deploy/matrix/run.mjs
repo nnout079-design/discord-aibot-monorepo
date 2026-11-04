@@ -36,6 +36,13 @@ const SERVICES = [
     health: "http://127.0.0.1:8100/health",
   },
   {
+    name: "conversation-graph",
+    argv: [PY, "-m", "uvicorn", "src.main:app", "--host", "127.0.0.1", "--port", "8200", "--workers", "1"],
+    cwd: "/app/services/conversation-graph",
+    env: { PYTHONPATH: "/app/services/conversation-graph", PORT: "8200" },
+    health: "http://127.0.0.1:8200/health",
+  },
+  {
     name: "soundproof",
     argv: ["node", "--max-old-space-size=1536", "dist/index.js"],
     cwd: "/app/bots/soundproof",

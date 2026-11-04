@@ -36,6 +36,7 @@ RUN /opt/llm-venv/bin/pip install --no-cache-dir -r /tmp/mh-req.txt -r /tmp/ae-r
 
 COPY services/mental-health /app/services/mental-health
 COPY services/audio-events /app/services/audio-events
+COPY services/conversation-graph /app/services/conversation-graph
 COPY --from=bots /build /app/bots
 COPY deploy/matrix/run.mjs /app/run.mjs
 

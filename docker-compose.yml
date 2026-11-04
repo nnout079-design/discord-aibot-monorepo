@@ -511,6 +511,37 @@ services:
     networks:
       - monitoring-network
 
+  # Conversation Graph Service (TTS-aware discussion clustering)
+  conversation-graph:
+    image: discord-conversation-graph:latest
+    container_name: conversation-graph-service
+    build: ./services/conversation-graph
+    ports:
+      - "127.0.0.1:8200:8200"
+    environment:
+      - PORT=8200
+      - STREAM_INGEST_TOKEN=${STREAM_INGEST_TOKEN}
+    restart: unless-stopped
+    logging: *app-logging
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request,sys;sys.exit(0 if urllib.request.urlopen('http://localhost:8200/health',timeout=5).status==200 else 1)\""]
+      interval: 30s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    networks:
+      - discord-network
+
   # Optional local generative LLM (opt-in via profile). Models live on the
   # ollama_data volume; pull a small one, e.g. `docker exec discord-ollama
   # ollama pull llama3.2:1b` (~1.3 GB RAM) or llama3.2:3b (~2.2 GB). 4 GB cap.
